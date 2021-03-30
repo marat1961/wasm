@@ -215,7 +215,8 @@ implementation
 
 function TOp.From(code: TInstruction; const name: string): TInstruction;
 begin
-
+  Self.code := code;
+  Self.name := name;
 end;
 
 end.
