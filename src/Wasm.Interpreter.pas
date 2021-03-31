@@ -3,16 +3,12 @@ unit Wasm.Interpreter;
 interface
 
 uses
-  System.Classes, System.SysUtils;
+  System.Classes, System.SysUtils, Wasm.Value;
 
 {$T+}
 {$SCOPEDENUMS ON}
 
 type
-
-  TValue = record
-
-  end;
 
   TResult = record
 
