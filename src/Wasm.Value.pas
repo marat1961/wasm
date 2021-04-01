@@ -1,4 +1,4 @@
-unit Wasm.Interpreter;
+unit Wasm.Value;
 
 interface
 
@@ -27,8 +27,6 @@ type
   end;
 
 implementation
-
-{ TValue }
 
 function TValue.AsInt32: Int32;
 begin

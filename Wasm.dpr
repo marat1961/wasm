@@ -7,7 +7,9 @@ program Wasm;
 uses
   System.SysUtils,
   Wasm.Instruction in 'src\Wasm.Instruction.pas',
-  Wasm.Interpreter in 'src\Wasm.Interpreter.pas';
+  Wasm.Interpreter in 'src\Wasm.Interpreter.pas',
+  Wasm.Types in 'src\Wasm.Types.pas',
+  Wasm.Value in 'src\Wasm.Value.pas';
 
 begin
   try
