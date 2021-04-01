@@ -30,7 +30,7 @@ implementation
 
 function TValue.AsInt32: Int32;
 begin
-  Result := f64;
+  Result := i64;
 end;
 
 function TValue.AsUint32: Uint32;

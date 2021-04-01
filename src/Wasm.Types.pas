@@ -3,7 +3,7 @@ unit Wasm.Types;
 interface
 
 uses
-  System.Classes, System.SysUtils;
+  System.Classes, System.SysUtils, Wasm.Value;
 
 {$T+}
 {$SCOPEDENUMS ON}
@@ -47,6 +47,31 @@ type
   type TLocalIdx = Cardinal;
 
   // Code Section
+  // Each section consists of
+  //  * a one-byte section id,
+  //  * the u32 size of the contents, in bytes,
+  //  * the actual contents, whose structure is depended on the section id.
+  // Every section is optional; an omitted section is equivalent to the section
+  // being present with empty contents.
+
+  // The following section ids are used:
+  // --------------------
+  // Id  Section
+  // --------------------
+  //  0  custom section
+  //  1  type section
+  //  2  import section
+  //  3  function section
+  //  4  table section
+  //  5  memory section
+  //  6  global section
+  //  7  export section
+  //  8  start section
+  //  9  element section
+  // 10  code section
+  // 11  data section
+  // 12  data count section
+  // --------------------
 
   // Function locals.
   TLocals = record
@@ -56,6 +81,25 @@ type
 
   TTable = record
     limits: TLimits;
+  end;
+
+  TMemory = record
+    limits: TLimits;
+  end;
+
+  TConstantExpression = record
+  type
+    TKind = (Constant, GlobalGet);
+  var
+    kind: TKind;
+    case Integer of
+      0: (constant: TValue);
+      1: (global_index: Cardinal);
+  end;
+
+  TGlobalType = record
+    value_type: TValType;
+    is_mutable: Boolean;
   end;
 
 implementation
