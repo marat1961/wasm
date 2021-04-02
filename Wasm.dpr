@@ -9,7 +9,9 @@ uses
   Wasm.Instruction in 'src\Wasm.Instruction.pas',
   Wasm.Interpreter in 'src\Wasm.Interpreter.pas',
   Wasm.Types in 'src\Wasm.Types.pas',
-  Wasm.Value in 'src\Wasm.Value.pas';
+  Wasm.Value in 'src\Wasm.Value.pas',
+  Wasm.Module in 'src\Wasm.Module.pas',
+  Wasm.Limits in 'src\Wasm.Limits.pas';
 
 begin
   try
