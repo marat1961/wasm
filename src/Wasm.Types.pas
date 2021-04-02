@@ -73,6 +73,20 @@ type
   // 12  data count section
   // --------------------
 
+  TSectionId = (
+    custom = 0,
+    &type = 1,
+    import = 2,
+    &function = 3,
+    table = 4,
+    memory = 5,
+    global = 6,
+    export_ = 7,
+    start = 8,
+    element = 9,
+    code = 10,
+    data = 11);
+
   // Function locals.
   TLocals = record
     count: Cardinal;
@@ -100,6 +114,57 @@ type
   TGlobalType = record
     value_type: TValType;
     is_mutable: Boolean;
+  end;
+
+  TGlobal = record
+    typ: TGlobalType;
+    expression: TConstantExpression;
+  end;
+
+  TExternalKind = (
+    &Function = $00,
+    Table = $01,
+    Memory = $02,
+    Global = $03);
+
+  TDescUnion = record
+    case Integer of
+      0: (function_type_index: TTypeIdx);
+      1: (memory: TMemory);
+      2: (global: TGlobalType);
+      3: (table: TTable);
+  end;
+
+  TImport = record
+    module: string;
+    name: string;
+    kind: TExternalKind;
+    desc: TDescUnion;
+  end;
+
+  TExport = record
+    name: string;
+    kind: TExternalKind;
+    index: Cardinal;
+  end;
+
+  TElement = record
+    offset: TConstantExpression;
+    init: TArray<TFuncIdx>;
+  end;
+
+  // The element of the code section.
+  TCode = record
+    max_stack_height: Integer;
+    local_count: Cardinal;
+    // The inrecordions bytecode interleaved with decoded immediate values.
+    inrecordions: TArray<Byte>;
+  end;
+
+  // The memory index is omitted from the recordure as the parser ensures it to be 0
+  Data = record
+    offset: TConstantExpression;
+    init: TBytes;
   end;
 
 implementation

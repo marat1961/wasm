@@ -3,7 +3,7 @@ unit Wasm.Interpreter;
 interface
 
 uses
-  System.Classes, System.SysUtils, Wasm.Value;
+  System.Classes, System.SysUtils, Wasm.Value, Wasm.Types;
 
 {$T+}
 {$SCOPEDENUMS ON}
