@@ -6,9 +6,6 @@ unit Oz.Wasm.Instruction;
 
 interface
 
-uses
-  System.Classes, System.SysUtils;
-
 {$T+}
 {$SCOPEDENUMS ON}
 

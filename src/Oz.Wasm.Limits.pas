@@ -6,9 +6,6 @@ unit Oz.Wasm.Limits;
 
 interface
 
-uses
-  System.Classes, System.SysUtils;
-
 const
   // The page size as defined by the WebAssembly 1.0 specification.
   PageSize: Cardinal = 65536;

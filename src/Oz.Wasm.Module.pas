@@ -7,7 +7,7 @@ unit Oz.Wasm.Module;
 interface
 
 uses
-  System.Classes, System.SysUtils, Oz.Wasm.Types;
+  Oz.Wasm.Types;
 
 {$T+}
 {$SCOPEDENUMS ON}

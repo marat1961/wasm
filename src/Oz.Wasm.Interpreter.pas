@@ -7,7 +7,6 @@ unit Oz.Wasm.Interpreter;
 interface
 
 uses
-  System.Classes, System.SysUtils,
   Oz.Wasm.Limits, Oz.Wasm.Module, Oz.Wasm.Value, Oz.Wasm.Types;
 
 {$T+}

@@ -6,9 +6,6 @@ unit Oz.Wasm.Value;
 
 interface
 
-uses
-  System.Classes, System.SysUtils;
-
 {$T+}
 {$SCOPEDENUMS ON}
 
@@ -54,7 +51,7 @@ end;
 
 function TValue.AsSingle: Single;
 begin
-  Result := f64;
+  Result := f32;
 end;
 
 function TValue.AsDouble: Double;

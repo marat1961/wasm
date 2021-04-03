@@ -87,12 +87,12 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="src\Wasm.Instruction.pas"/>
-        <DCCReference Include="src\Wasm.Interpreter.pas"/>
-        <DCCReference Include="src\Wasm.Types.pas"/>
-        <DCCReference Include="src\Wasm.Value.pas"/>
-        <DCCReference Include="src\Wasm.Module.pas"/>
-        <DCCReference Include="src\Wasm.Limits.pas"/>
+        <DCCReference Include="src\Oz.Wasm.Instruction.pas"/>
+        <DCCReference Include="src\Oz.Wasm.Types.pas"/>
+        <DCCReference Include="src\Oz.Wasm.Value.pas"/>
+        <DCCReference Include="src\Oz.Wasm.Module.pas"/>
+        <DCCReference Include="src\Oz.Wasm.Limits.pas"/>
+        <DCCReference Include="src\Oz.Wasm.Interpreter.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

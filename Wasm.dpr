@@ -1,3 +1,7 @@
+(* Oz.Wasm: A fast Delphi WebAssembly interpreter
+ * Copyright (c) 2021 Tomsk, Marat Shaimardanov
+ * SPDX-License-Identifier: Apache-2.0
+ *)
 program Wasm;
 
 {$APPTYPE CONSOLE}
@@ -6,12 +10,12 @@ program Wasm;
 
 uses
   System.SysUtils,
-  Wasm.Instruction in 'src\Wasm.Instruction.pas',
-  Wasm.Interpreter in 'src\Wasm.Interpreter.pas',
-  Wasm.Types in 'src\Wasm.Types.pas',
-  Wasm.Value in 'src\Wasm.Value.pas',
-  Wasm.Module in 'src\Wasm.Module.pas',
-  Wasm.Limits in 'src\Wasm.Limits.pas';
+  Oz.Wasm.Instruction in 'src\Oz.Wasm.Instruction.pas',
+  Oz.Wasm.Types in 'src\Oz.Wasm.Types.pas',
+  Oz.Wasm.Value in 'src\Oz.Wasm.Value.pas',
+  Oz.Wasm.Module in 'src\Oz.Wasm.Module.pas',
+  Oz.Wasm.Limits in 'src\Oz.Wasm.Limits.pas',
+  Oz.Wasm.Interpreter in 'src\Oz.Wasm.Interpreter.pas';
 
 begin
   try
