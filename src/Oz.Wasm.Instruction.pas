@@ -1,4 +1,8 @@
-unit Wasm.Instruction;
+(* Oz.Wasm: A fast Delphi WebAssembly interpreter
+ * Copyright (c) 2021 Tomsk, Marat Shaimardanov
+ * SPDX-License-Identifier: Apache-2.0
+ *)
+unit Oz.Wasm.Instruction;
 
 interface
 

@@ -1,9 +1,14 @@
-unit Wasm.Interpreter;
+(* Oz.Wasm: A fast Delphi WebAssembly interpreter
+ * Copyright (c) 2021 Tomsk, Marat Shaimardanov
+ * SPDX-License-Identifier: Apache-2.0
+ *)
+unit Oz.Wasm.Interpreter;
 
 interface
 
 uses
-  System.Classes, System.SysUtils, Wasm.Limits, Wasm.Module, Wasm.Value, Wasm.Types;
+  System.Classes, System.SysUtils,
+  Oz.Wasm.Limits, Oz.Wasm.Module, Oz.Wasm.Value, Oz.Wasm.Types;
 
 {$T+}
 {$SCOPEDENUMS ON}
@@ -35,7 +40,6 @@ type
     TGuard = class
     end;
   end;
-
 
   TResult = record
 

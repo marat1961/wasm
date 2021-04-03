@@ -1,9 +1,13 @@
-unit Wasm.Types;
+(* Oz.Wasm: A fast Delphi WebAssembly interpreter
+ * Copyright (c) 2021 Tomsk, Marat Shaimardanov
+ * SPDX-License-Identifier: Apache-2.0
+ *)
+unit Oz.Wasm.Types;
 
 interface
 
 uses
-  System.Classes, System.SysUtils, Wasm.Value;
+  System.Classes, System.SysUtils, Oz.Wasm.Value;
 
 {$T+}
 {$SCOPEDENUMS ON}
@@ -162,7 +166,7 @@ type
   end;
 
   // The memory index is omitted from the recordure as the parser ensures it to be 0
-  Data = record
+  TData = record
     offset: TConstantExpression;
     init: TBytes;
   end;
