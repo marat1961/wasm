@@ -6,6 +6,9 @@ unit Oz.Wasm.Instruction;
 
 interface
 
+uses
+  Oz.Wasm.Value;
+
 {$T+}
 {$SCOPEDENUMS ON}
 
