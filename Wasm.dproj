@@ -87,6 +87,7 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
+        <DCCReference Include="src\Oz.SGL.Span.pas"/>
         <DCCReference Include="src\Oz.Wasm.Instruction.pas"/>
         <DCCReference Include="src\Oz.Wasm.Types.pas"/>
         <DCCReference Include="src\Oz.Wasm.Value.pas"/>

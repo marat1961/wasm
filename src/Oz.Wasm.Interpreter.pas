@@ -7,7 +7,8 @@ unit Oz.Wasm.Interpreter;
 interface
 
 uses
-  System.SysUtils, Oz.Wasm.Limits, Oz.Wasm.Module, Oz.Wasm.Value, Oz.Wasm.Types;
+  System.SysUtils, Oz.SGL.Span,
+  Oz.Wasm.Limits, Oz.Wasm.Module, Oz.Wasm.Value, Oz.Wasm.Types;
 
 {$T+}
 {$SCOPEDENUMS ON}
@@ -84,10 +85,55 @@ type
 
 {$EndRegion}
 
+{$Region 'ExecuteFunction: WebAssembly or host function execution'}
+
+  THostFunctionPtr = function(host_context: TObject; Instance: Pointer;
+    const args: TValue; var ctx: TExecutionContext): TExecutionResult;
+
+  TExecuteFunction = class
+  private
+    // Pointer to WebAssembly function instance.
+    // Equals nullptr in case this ExecuteFunction represents host function.
+    m_instance: PInstance;
+    // Index of WebAssembly function.
+    // Equals 0 in case this ExecuteFunction represents host function.
+    m_func_idx: TFuncIdx;
+    // Pointer to a host function.
+    // Equals nullptr in case this ExecuteFunction represents WebAssembly function.
+    m_host_function: THostFunctionPtr;
+    // Opaque context of host function execution,
+    // which is passed to it as host_context parameter.
+    // Doesn't have value in case this ExecuteFunction represents WebAssembly function.
+    m_host_context: TObject;
+  public
+    constructor Create(instance: PInstance; func_idx: TFuncIdx); overload;
+    // Host function constructor without context.
+    // The function will always be called with empty host_context argument.
+    constructor Create(f: THostFunctionPtr); overload;
+    // Host function constructor with context.
+    // The function will be called with a reference to @a host_context.
+    // Copies of the function will have their own copy of @a host_context.
+    constructor Create(f: THostFunctionPtr; host_context: TObject); overload;
+    // Function call operator.
+    function Call(instance: PInstance; const args: TValue;
+      var ctx: TExecutionContext): TExecutionResult;
+    // Function pointer stored inside this object.
+    function GetHostFunction: THostFunctionPtr;
+  end;
+
+{$EndRegion}
+
 {$Region 'TExternalFunction: imported and exported functions'}
 
   TExternalFunction = record
-
+  var
+    func: TExecuteFunction;
+    input_types: TSpan<TValType>;
+    output_types: TSpan<TValType>;
+  public
+    constructor From(const func: TExecuteFunction; const input_types: TSpan<TValType>;
+      const output_types: TSpan<TValType>); overload;
+    constructor From(const func: TExecuteFunction; const typ: TFuncType); overload;
   end;
 
 {$EndRegion}
@@ -152,22 +198,22 @@ type
 //             match the expected number of input parameters of the function, otherwise
 //             undefined behaviour (including crash) happens.
 //   ctx       Execution context.
-function execute(var instance: TInstance; func_idx: TFuncIdx;
+function Execute(instance: PInstance; func_idx: TFuncIdx;
   const args: TValue; var ctx: TExecutionContext): TExecutionResult; overload;
 
 // Execute a function from an instance with execution context starting with default
 // depth of 0. Arguments and behavior is the same as in the other execute().
-function execute(var instance: TInstance; func_idx: TFuncIdx;
+function Execute(instance: PInstance; func_idx: TFuncIdx;
   const args: TValue): TExecutionResult; inline; overload;
 
 implementation
 
-function execute(var instance: TInstance; func_idx: TFuncIdx;
+function Execute(instance: PInstance; func_idx: TFuncIdx;
   const args: TValue; var ctx: TExecutionContext): TExecutionResult;
 begin
 end;
 
-function execute(var instance: TInstance; func_idx: TFuncIdx;
+function Execute(instance: PInstance; func_idx: TFuncIdx;
   const args: TValue): TExecutionResult; inline; overload;
 var
   ctx: TExecutionContext;
@@ -287,6 +333,59 @@ function TExecutionContext.increment_call_depth: TGuard;
 begin
   Inc(depth);
   Result := TGuard.Create(Self);
+end;
+
+{$EndRegion}
+
+{$Region 'ExecuteFunction'}
+
+constructor TExecuteFunction.Create(instance: PInstance; func_idx: TFuncIdx);
+begin
+  inherited Create;
+  m_instance := instance;
+  m_func_idx := func_idx;
+end;
+
+constructor TExecuteFunction.Create(f: THostFunctionPtr);
+begin
+  inherited Create;
+  m_host_function := f;
+end;
+
+constructor TExecuteFunction.Create(f: THostFunctionPtr; host_context: TObject);
+begin
+  inherited Create;
+  m_host_function := f;
+  m_host_context := host_context;
+end;
+
+function TExecuteFunction.Call(instance: PInstance; const args: TValue;
+  var ctx: TExecutionContext): TExecutionResult;
+begin
+  if m_instance <> nil then
+    Result := execute(m_instance, m_func_idx, args, ctx)
+  else
+    Result := m_host_function(m_host_context, instance, args, ctx);
+end;
+
+function TExecuteFunction.GetHostFunction: THostFunctionPtr;
+begin
+  Result := m_host_function;
+end;
+
+{$EndRegion}
+
+{$Region 'TExternalFunction'}
+
+constructor TExternalFunction.From(const func: TExecuteFunction; const typ: TFuncType);
+begin
+
+end;
+
+constructor TExternalFunction.From(const func: TExecuteFunction; const input_types,
+  output_types: TSpan<TValType>);
+begin
+
 end;
 
 {$EndRegion}

@@ -10,6 +10,7 @@ program Wasm;
 
 uses
   System.SysUtils,
+  Oz.SGL.Span in 'src\Oz.SGL.Span.pas',
   Oz.Wasm.Instruction in 'src\Oz.Wasm.Instruction.pas',
   Oz.Wasm.Types in 'src\Oz.Wasm.Types.pas',
   Oz.Wasm.Value in 'src\Oz.Wasm.Value.pas',
@@ -19,7 +20,7 @@ uses
 
 begin
   try
-    { TODO -oUser -cConsole Main : Insert code here }
+
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);
