@@ -1,6 +1,6 @@
 (* Oz.SGL
  * Copyright (c) 2021 Tomsk, Marat Shaimardanov
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: (GPL-3.0-or-later OR Apache-2.0)
  *)
 unit Oz.SGL.Span;
 
