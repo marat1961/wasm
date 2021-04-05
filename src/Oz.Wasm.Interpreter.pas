@@ -7,7 +7,7 @@ unit Oz.Wasm.Interpreter;
 interface
 
 uses
-  System.SysUtils, Oz.SGL.Span,
+  System.SysUtils, Oz.SGL.Span, Oz.Wasm.Utils,
   Oz.Wasm.Limits, Oz.Wasm.Module, Oz.Wasm.Value, Oz.Wasm.Types;
 
 {$T+}
@@ -189,6 +189,14 @@ type
 
 {$EndRegion}
 
+{$Region 'execute functions'}
+
+// Execute a function from an instance with execution context
+// starting with default depth of 0.
+// Arguments and behavior is the same as in the other execute.
+function Execute(instance: PInstance; func_idx: TFuncIdx;
+  const args: TValue): TExecutionResult; inline; overload;
+
 // Execute a function from an instance.
 // Parameters
 //   instance  The instance.
@@ -201,101 +209,9 @@ type
 function Execute(instance: PInstance; func_idx: TFuncIdx;
   const args: TValue; var ctx: TExecutionContext): TExecutionResult; overload;
 
-// Execute a function from an instance with execution context starting with default
-// depth of 0. Arguments and behavior is the same as in the other execute().
-function Execute(instance: PInstance; func_idx: TFuncIdx;
-  const args: TValue): TExecutionResult; inline; overload;
+{$EndRegion}
 
 implementation
-
-function Execute(instance: PInstance; func_idx: TFuncIdx;
-  const args: TValue; var ctx: TExecutionContext): TExecutionResult;
-begin
-end;
-
-function Execute(instance: PInstance; func_idx: TFuncIdx;
-  const args: TValue): TExecutionResult; inline; overload;
-var
-  ctx: TExecutionContext;
-begin
-  Result := execute(instance, func_idx, args, ctx);
-end;
-
-type
-
-  TFunctionAddress = record
-
-  end;
-
-
-  TTTableAddress = record
-
-  end;
-
-  TMemoryAddress = record
-
-  end;
-
-
-  TGlobalAddress = record
-
-  end;
-
-  TModuleInstance = record
-
-  end;
-
-  TWasmFunc = record
-
-  end;
-
-  THostFunc = record
-
-  end;
-
-  TTableInstance = record
-
-  end;
-
-  TMemoryInstance = record
-
-  end;
-
-  TGlobalInstance = record
-
-  end;
-
-  TStore = record
-
-  end;
-
-  TExportInstance = record
-
-  end;
-
-  TLabel = record
-
-  end;
-
-  TFrame = record
-
-  end;
-
-  TStack = record
-
-  end;
-
-  TConfiguration = record
-
-  end;
-
-  TArithmeticLogicUnit = record
-
-  end;
-
-  TMachine = record
-
-  end;
 
 {$Region 'TExecutionResult'}
 
@@ -408,6 +324,44 @@ begin
   Self.globals := globals;
   Self.imported_functions := imported_functions;
   Self.imported_globals := imported_globals;
+end;
+
+{$EndRegion}
+
+{$Region 'execute functions'}
+
+function Execute(instance: PInstance; func_idx: TFuncIdx;
+  const args: TValue): TExecutionResult; inline; overload;
+var
+  ctx: TExecutionContext;
+begin
+  Result := execute(instance, func_idx, args, ctx);
+end;
+
+function Execute(instance: PInstance; func_idx: TFuncIdx;
+  const args: TValue; var ctx: TExecutionContext): TExecutionResult;
+var
+  func_type: TFuncType;
+  code: TCode;
+  memory: TBytes;
+  stack: TOperandStack;
+  pc: PByte;
+begin
+  Assert(ctx.depth >= 0);
+  if ctx.depth >= CallStackLimit then
+    exit(Trap);
+  func_type := instance.module.get_function_type(func_idx);
+
+  Assert(Length(instance.module.imported_function_types) = Length(instance.imported_functions));
+  if func_idx < Cardinal(Length(instance.imported_functions)) then
+    exit(instance.imported_functions[func_idx].func.Call(instance, args, ctx));
+
+  code := instance.module.get_code(func_idx);
+  memory := instance.memory;
+
+  stack(args, Length(func_type.inputs), code.local_count, code.max_stack_height);
+
+  pc := code.instructions.data();
 end;
 
 {$EndRegion}
