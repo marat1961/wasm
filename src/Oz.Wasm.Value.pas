@@ -11,6 +11,7 @@ interface
 
 type
 
+  PValue = ^TValue;
   TValue = record
   public
     function AsInt32: Int32;
