@@ -359,7 +359,8 @@ begin
   code := instance.module.get_code(func_idx);
   memory := instance.memory;
 
-  stack(args, Length(func_type.inputs), code.local_count, code.max_stack_height);
+  stack := TOperandStack.From(args, Length(func_type.inputs), code.local_count,
+    code.max_stack_height);
 
   pc := code.instructions.data();
 end;
