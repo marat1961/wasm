@@ -12,8 +12,12 @@ uses
 type
 
   TStd = record
+    // Copies exactly count values from the range beginning
+    // at first to the range beginning at result.
     class function CopyN<T>(First: Pointer; Count: Cardinal; var R): Pointer; static;
-    class procedure FillN<T>(first: Pointer; count: Cardinal; const value: T); static;
+    // Assigns the given value to the first count elements
+    // in the range beginning at first if count > 0.
+    class procedure FillN<T>(First: Pointer; Count: Cardinal; const Value: T); static;
   end;
 
 {$Region 'TSpan: a contiguous sequence of objects'}
@@ -95,9 +99,19 @@ begin
   Result := @R;
 end;
 
-class procedure TStd.FillN<T>(first: Pointer; count: Cardinal; const value: T);
+class procedure TStd.FillN<T>(First: Pointer; Count: Cardinal; const Value: T);
+type
+  Pt = ^T;
+var
+  p: Pt;
 begin
-
+  p := First;
+  while Count > 0 do
+  begin
+    p^ := Value;
+    Inc(PByte(p), sizeof(T));
+    Dec(Count);
+  end;
 end;
 
 {$EndRegion}

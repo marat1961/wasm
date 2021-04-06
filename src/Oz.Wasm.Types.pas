@@ -161,8 +161,8 @@ type
   TCode = record
     max_stack_height: Integer;
     local_count: Cardinal;
-    // The inrecordions bytecode interleaved with decoded immediate values.
-    inrecordions: TArray<Byte>;
+    // The instructions bytecode interleaved with decoded immediate values.
+    instructions: TArray<Byte>;
   end;
 
   // The memory index is omitted from the recordure as the parser ensures it to be 0
