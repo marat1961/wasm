@@ -131,7 +131,7 @@ end;
 
 function TSpan<T>.GetItem(Index: Integer): T;
 begin
-
+  Result := PItem(PByte(FStart) + sizeof(T) * Index)^;
 end;
 
 {$EndRegion}

@@ -10,7 +10,6 @@ program Wasm;
 
 uses
   System.SysUtils,
-  Oz.SGL.Span in 'src\Oz.SGL.Span.pas',
   Oz.Wasm.Instruction in 'src\Oz.Wasm.Instruction.pas',
   Oz.Wasm.Types in 'src\Oz.Wasm.Types.pas',
   Oz.Wasm.Value in 'src\Oz.Wasm.Value.pas',

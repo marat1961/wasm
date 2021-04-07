@@ -71,7 +71,7 @@ type
     i64_store8 = $3C,          // 'i64.store8'
     i64_store16 = $3D,         // 'i64.store16'
     i64_store32 = $3E,         // 'i64.store32'
-    current_memory = $3F,       // 'memory.size'
+    current_memory = $3F,      // 'memory.size'
     grow_memory = $40,         // 'memory.grow'
 
     // numeric instructions
