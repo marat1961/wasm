@@ -11,6 +11,8 @@ uses
 
 type
 
+{$Region 'TStd'}
+
   TStd = record
     // Copies exactly count values from the range beginning
     // at first to the range beginning at result.
@@ -19,6 +21,8 @@ type
     // in the range beginning at first if count > 0.
     class procedure FillN<T>(First: Pointer; Count: Cardinal; const Value: T); static;
   end;
+
+{$EndRegion}
 
 {$Region 'TSpan: a contiguous sequence of objects'}
 
@@ -70,9 +74,24 @@ type
     FBottom: PValue;
     FSmallStorage: array [0..SmallStorageSize] of TValue;
     FLargeStorage: TArray<TValue>;
+    function GetItem(Index: Integer): PValue;
   public
     constructor From(const args: PValue;
       num_args, num_local_variables, max_stack_height: Cardinal);
+    // The current number of items on the stack (aka stack height).
+    function Size: Integer;
+    // Pushes an item on the stack.
+    // The stack max height limit is not checked.
+    procedure Push(Item: TValue);
+    // Returns the reference to the top item.
+    // Requires non-empty stack.
+    function Top: TValue;
+    // Returns an item popped from the top of the stack.
+    // Requires non-empty stack.
+    function Pop: TValue;
+    // Returns the reference to the stack item on given position from the stack top.
+    // Requires index < size().
+    property Items[Index: Integer]: PValue read GetItem;
   end;
 
 {$EndRegion}
@@ -207,6 +226,36 @@ begin
 
   local_variables := TStd.CopyN<PValue>(args, num_args, FLocals^);
   TStd.FillN<TValue>(local_variables, num_local_variables, TValue.From(0));
+end;
+
+function TOperandStack.GetItem(Index: Integer): PValue;
+begin
+  Assert(index < size);
+  Result := PValue(PByte(FTop) - Index * sizeof(TValue));
+end;
+
+function TOperandStack.Size: Integer;
+begin
+  Result := PByte(FTop) + 1 - PByte(FBottom);
+end;
+
+procedure TOperandStack.Push(Item: TValue);
+begin
+  Inc(FTop, sizeof(TValue));
+  FTop^ := Item;
+end;
+
+function TOperandStack.Top: TValue;
+begin
+  Assert(size <> 0);
+  Result := FTop^;
+end;
+
+function TOperandStack.Pop: TValue;
+begin
+  Assert(size <> 0);
+  Result := FTop^;
+  Dec(FTop, sizeof(TValue));
 end;
 
 {$EndRegion}
