@@ -38,11 +38,11 @@ type
     res1D = $1D, res1E = $1E, res1F = $1F,
 
     // variable instructions
-    get_local = $20,           // 'local.get'
-    set_local = $21,           // 'local.set'
-    tee_local = $22,           // 'local.tee'
-    get_global = $23,          // 'global.get'
-    set_global = $24,          // 'global.set'
+    local_get = $20,           // 'local.get'
+    local_set = $21,           // 'local.set'
+    local_tee = $22,           // 'local.tee'
+    global_get = $23,          // 'global.get'
+    global_set = $24,          // 'global.set'
     table_get = $25,           // 'table.get;
     table_set = $26,           // 'table.set'
     res27 = $27,

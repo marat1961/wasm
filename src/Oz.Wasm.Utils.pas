@@ -91,10 +91,9 @@ type
     function Pop: TValue;
     // Returns iterator to the bottom of the stack.
     function rbegin: PValue;
-//    *  const noexcept { return m_bottom; }
     // Returns end iterator counting from the bottom of the stack.
     function rend: PValue;
-//    const Value* rend() const noexcept { return m_top + 1; }
+    function local(index: Integer): PValue;
     // Drop num items from the top of the stack.
     procedure Drop(num: Cardinal);
     // Returns the reference to the stack item on given position from the stack top.
@@ -210,7 +209,7 @@ end;
 
 procedure TOperandStack.Drop(num: Cardinal);
 begin
-  Assert(num <= Size);
+  Assert(num <= Cardinal(Size));
   Dec(FTop, num);
 end;
 
@@ -224,7 +223,7 @@ begin
   // To avoid potential UB when there are no locals and the stack pointer
   // is set to m_bottom - 1 (i.e. before storage array),
   // we allocate one additional unused stack item.
-  num_locals_adjusted := num_locals + Ord(num_locals = 0);  // Bump to 1 if 0.
+  num_locals_adjusted := num_locals + Cardinal(Ord(num_locals = 0)); // Bump to 1 if 0.
   storage_size_required := num_locals_adjusted + max_stack_height;
 
   if storage_size_required <= SmallStorageSize then
@@ -246,6 +245,12 @@ function TOperandStack.GetItem(Index: Integer): PValue;
 begin
   Assert(index < size);
   Result := PValue(PByte(FTop) - Index * sizeof(TValue));
+end;
+
+function TOperandStack.local(index: Integer): PValue;
+begin
+  Result := PValue(PByte(FLocals) + index);
+  Assert(NativeUInt(Result) < NativeUInt(FBottom));
 end;
 
 function TOperandStack.Size: Integer;
