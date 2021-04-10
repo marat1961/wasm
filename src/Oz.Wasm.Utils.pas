@@ -89,6 +89,8 @@ type
     // Returns an item popped from the top of the stack.
     // Requires non-empty stack.
     function Pop: TValue;
+    // Drop num items from the top of the stack.
+    procedure Drop(num: Cardinal);
     // Returns the reference to the stack item on given position from the stack top.
     // Requires index < size().
     property Items[Index: Integer]: PValue read GetItem;
@@ -199,6 +201,12 @@ end;
 {$EndRegion}
 
 {$Region 'TOperandStack<T>'}
+
+procedure TOperandStack.Drop(num: Cardinal);
+begin
+  Assert(num <= Size);
+  Dec(FTop, num);
+end;
 
 constructor TOperandStack.From(const args: PValue;
   num_args, num_local_variables, max_stack_height: Cardinal);
