@@ -85,10 +85,16 @@ type
     procedure Push(Item: TValue);
     // Returns the reference to the top item.
     // Requires non-empty stack.
-    function Top: TValue;
+    function Top: PValue;
     // Returns an item popped from the top of the stack.
     // Requires non-empty stack.
     function Pop: TValue;
+    // Returns iterator to the bottom of the stack.
+    function rbegin: PValue;
+//    *  const noexcept { return m_bottom; }
+    // Returns end iterator counting from the bottom of the stack.
+    function rend: PValue;
+//    const Value* rend() const noexcept { return m_top + 1; }
     // Drop num items from the top of the stack.
     procedure Drop(num: Cardinal);
     // Returns the reference to the stack item on given position from the stack top.
@@ -253,10 +259,20 @@ begin
   FTop^ := Item;
 end;
 
-function TOperandStack.Top: TValue;
+function TOperandStack.rbegin: PValue;
+begin
+  Result := FBottom;
+end;
+
+function TOperandStack.rend: PValue;
+begin
+  Result := PValue(PByte(FTop) + 1);
+end;
+
+function TOperandStack.Top: PValue;
 begin
   Assert(size <> 0);
-  Result := FTop^;
+  Result := FTop;
 end;
 
 function TOperandStack.Pop: TValue;
