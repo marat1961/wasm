@@ -21,7 +21,7 @@ type
     function AsInt64: Int64;
     function AsSingle: Single;
     function AsDouble: Double;
-  private
+  var
     case Integer of
       1: (i32: Uint32);
       2: (i64: Uint64);

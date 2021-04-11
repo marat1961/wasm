@@ -190,19 +190,35 @@ type
 
 {$EndRegion}
 
-{$Region 'subroutines'}
+{$Region 'TVm'}
+
+  TVm = record
+  private
+    instance: PInstance;
+    code: TCode;
+    memory: TBytes;
+    stack: TOperandStack;
+    pc: PByte;
+    vi: Uint64;
+    function GetMemory: PByte;
+    function CheckLoad<SrcT>: Boolean; inline;
+    function LoadFromMemory<T: record>: T; inline;
+    function CheckStore<DstT>: Boolean; inline;
+    procedure StoreToMemory<T>(const value: T);
+    procedure Branch(arity: Uint32);
+  public
+    procedure Init(instance: PInstance; func_idx: TFuncIdx; const args: PValue);
+    procedure Execute(var ctx: TExecutionContext);
+  end;
+
+{$EndRegion}
+
+{$Region 'PByteHelper'}
 
   PByteHelper = record helper for PByte
     function read<T>: T; inline;
     procedure store<T>(offset: Cardinal; value: T); inline;
     function load<T>(offset: Cardinal): T; inline;
-  end;
-
-  TBytesHelper = record helper for TBytes
-    function GetMemory: PByte; inline;
-    function load_from_memory<DstT, SrcT>(var stack: TOperandStack;
-      const immediates: PByte): Boolean; inline;
-    property memory: PByte read GetMemory;
   end;
 
 {$EndRegion}
@@ -373,28 +389,59 @@ end;
 
 {$EndRegion}
 
-{$Region 'subroutines'}
+{$Region 'TVm'}
 
-function TBytesHelper.load_from_memory<DstT, SrcT>(var stack: TOperandStack;
-  const immediates: PByte): Boolean;
+procedure TVm.Init(instance: PInstance; func_idx: TFuncIdx; const args: PValue);
 var
-  address, offset: Uint32;
-  r: SrcT;
+  func_type: TFuncType;
+begin
+  Self.instance := instance;
+  Self.code := instance.module.get_code(func_idx);
+  Self.memory := instance.memory;
+  func_type := instance.module.get_function_type(func_idx);
+  Self.stack := TOperandStack.From(args, Length(func_type.inputs), code.local_count, code.max_stack_height);
+  Self.pc := @code.instructions[0];
+end;
+
+function TVm.CheckLoad<SrcT>: Boolean;
+var
+  address, offset: Int32;
 begin
   address := stack.Top.AsInt32;
   // NOTE: alignment is dropped by the parser
-  offset := immediates.read<Uint32>;
+  offset := pc.read<Uint32>;
+  vi := Uint64(address) + offset;
   // Addressing is 32-bit, but we keep the value as 64-bit to detect overflows.
-  if (Uint64(address) + offset + sizeof(SrcT)) > Length(Self) then
-    exit(False);
-
-  r := memory.load<SrcT>(address + offset);
-  stack.top^ := extend<DstT>(r);
-  Result := True;
+  Result := vi + sizeof(SrcT) <= Length(memory);
 end;
 
-procedure branch(const code: TCode; var stack: TOperandStack;
-  var pc: PByte; arity: Uint32);
+function TVm.LoadFromMemory<T>: T;
+type Pt = ^T;
+begin
+  var pv: PByte := @memory[0];
+  Inc(pv, vi);
+  Result := Pt(pv)^;
+end;
+
+function TVm.CheckStore<DstT>: Boolean;
+var
+  address, offset: Int32;
+begin
+  address := stack.Pop.AsInt32;
+  // NOTE: alignment is dropped by the parser
+  offset := pc.read<Uint32>;
+  vi := Uint64(address) + offset;
+  // Addressing is 32-bit, but we keep the value as 64-bit to detect overflows.
+  Result := vi + sizeof(DstT) <= Length(memory);
+end;
+
+procedure TVm.StoreToMemory<T>(const value: T);
+begin
+  var pv: PByte := @memory[0];
+  pv.store(vi, value);
+end;
+
+procedure TVm.Branch(arity: Uint32);
 var
   code_offset, stack_drop: Uint32;
   r: TValue;
@@ -444,48 +491,13 @@ begin
   Result := True;
 end;
 
-{$EndRegion}
-
-{$Region 'execute functions'}
-
-function Execute(instance: PInstance; func_idx: TFuncIdx;
-  const args: PValue): TExecutionResult; inline; overload;
-var
-  ctx: TExecutionContext;
-begin
-  Result := execute(instance, func_idx, args, ctx);
-end;
-
-function Execute(instance: PInstance; func_idx: TFuncIdx;
-  const args: PValue; var ctx: TExecutionContext): TExecutionResult;
+procedure TVm.Execute(var ctx: TExecutionContext);
 label
   traps, ends;
 var
-  func_type: TFuncType;
-  code: TCode;
-  memory: TBytes;
-  stack: TOperandStack;
-  pc: PByte;
   instruction: TInstruction;
 begin
-  Assert(ctx.depth >= 0);
-  if ctx.depth >= CallStackLimit then
-    exit(Trap);
-  func_type := instance.module.get_function_type(func_idx);
-
-  Assert(Length(instance.module.imported_function_types) = Length(instance.imported_functions));
-  if func_idx < Cardinal(Length(instance.imported_functions)) then
-    exit(instance.imported_functions[func_idx].func.Call(instance, args, ctx));
-
-  code := instance.module.get_code(func_idx);
-  memory := instance.memory;
-
-  stack := TOperandStack.From(args, Length(func_type.inputs), code.local_count,
-    code.max_stack_height);
-
-  pc := @code.instructions[0];
-  while True do
-  begin
+  repeat
     instruction := TInstruction(pc^);
     Inc(pc);
     case instruction of
@@ -522,7 +534,7 @@ begin
           // Check condition for br_if.
           if (instruction = TInstruction.br_if) and (stack.pop.AsUint32 = 0) then
             pc := pc + BranchImmediateSize;
-          branch(code, stack, pc, arity);
+          Branch(arity);
         end;
       TInstruction.br_table:
         begin
@@ -535,7 +547,7 @@ begin
           else
             label_idx_offset := br_table_size * BranchImmediateSize;
           pc := pc + label_idx_offset;
-          branch(code, stack, pc, arity);
+          Branch(arity);
         end;
       TInstruction.call:
         begin
@@ -624,68 +636,117 @@ begin
           end;
         end;
       TInstruction.i32_load:
-        if not memory.load_from_memory<Uint32, Uint32>(stack, pc) then
-          goto traps;
+        begin
+          if not CheckLoad<Uint32> then goto traps;
+          stack.Top.i32 := LoadFromMemory<Uint32>;
+        end;
       TInstruction.i64_load:
-        if not memory.load_from_memory<Int64, Int64>(stack, pc) then
-            goto traps;
+        begin
+          if not CheckLoad<Uint64> then goto traps;
+          stack.Top.i64 := LoadFromMemory<Uint64>;
+        end;
       TInstruction.f32_load:
-        if not memory.load_from_memory<Single, Single>(stack, pc) then
-          goto traps;
+        begin
+          if not CheckLoad<Single> then goto traps;
+          stack.Top.f32 := LoadFromMemory<Single>;
+        end;
       TInstruction.f64_load:
-        if not memory.load_from_memory<Double, Double>(stack, pc) then
-          goto traps;
+        begin
+          if not CheckLoad<Double> then goto traps;
+          stack.Top.f64 := LoadFromMemory<Double>;
+        end;
       TInstruction.i32_load8_s:
-        if not memory.load_from_memory<Uint32, Int8>(stack, pc) then
-          goto traps;
+        begin
+          if not CheckLoad<Int8> then goto traps;
+          stack.Top.i32 := LoadFromMemory<Int8>;
+        end;
       TInstruction.i32_load8_u:
-        if not memory.load_from_memory<Uint32, Uint8>(stack, pc)then
-          goto traps;
+        begin
+          if not CheckLoad<Uint8> then goto traps;
+          stack.Top.i32 := LoadFromMemory<Uint8>;
+        end;
       TInstruction.i32_load16_s:
-        if not memory.load_from_memory<Uint32, Int16>(stack, pc) then
-           goto traps;
+        begin
+          if not CheckLoad<Int16> then goto traps;
+          stack.Top.i32 := LoadFromMemory<Int16>;
+        end;
       TInstruction.i32_load16_u:
-        if not memory.load_from_memory<Uint32, Uint16>(stack, pc) then
-          goto traps;
+        begin
+          if not CheckLoad<Uint8> then goto traps;
+          stack.Top.i32 := LoadFromMemory<Uint8>;
+        end;
       TInstruction.i64_load8_s:
-        if not memory.load_from_memory<Int64, Int8>(stack, pc) then
-          goto traps;
+        begin
+          if not CheckLoad<Int8> then goto traps;
+          stack.Top.i64 := LoadFromMemory<Int8>;
+        end;
       TInstruction.i64_load8_u:
-        if not memory.load_from_memory<Int64, Uint8>(stack, pc) then
-          goto traps;
+        begin
+          if not CheckLoad<Uint8> then goto traps;
+          stack.Top.i64 := LoadFromMemory<Uint8>;
+        end;
       TInstruction.i64_load16_s:
-        if not memory.load_from_memory<Int64, Int16>(stack, pc) then
-          goto traps;
+        begin
+          if not CheckLoad<Int16> then goto traps;
+          stack.Top.i64 := LoadFromMemory<Int16>;
+        end;
       TInstruction.i64_load16_u:
-        if not memory.load_from_memory<Int64, Uint16>(stack, pc) then
-          goto traps;
+        begin
+          if not CheckLoad<Uint16> then goto traps;
+          stack.Top.i64 := LoadFromMemory<Uint16>;
+        end;
       TInstruction.i64_load32_s:
-        if not memory.load_from_memory<Int64, Int32>(stack, pc) then
-          goto traps;
+        begin
+          if not CheckLoad<Int32> then goto traps;
+          stack.Top.i64 := LoadFromMemory<Int32>;
+        end;
       TInstruction.i64_load32_u:
-        if not memory.load_from_memory<Int64, Uint32>(stack, pc) then
-          goto traps;
+        begin
+          if not CheckLoad<Uint32> then goto traps;
+          stack.Top.i64 := LoadFromMemory<Uint32>;
+        end;
       TInstruction.i32_store:
-        if not memory.store_into_memory<Uint32>(stack, pc) then
-          goto traps;
+        begin
+          var value := stack.Pop.i32;
+          if not CheckStore<Uint32> then goto traps;
+          StoreToMemory<Uint32>(value);
+        end;
       TInstruction.i64_store:
-        if not memory.store_into_memory<Int64>(stack, pc) then
-          goto traps;
+        begin
+          var value := stack.Pop.i64;
+          if not CheckStore<Int64> then goto traps;
+          StoreToMemory<Int64>(value);
+        end;
       TInstruction.f32_store:
-        if not memory.store_into_memory<float>(stack, pc) then
-          goto traps;
+        begin
+          var value := stack.Pop.f32;
+          if not CheckStore<Single> then goto traps;
+          StoreToMemory<Single>(value);
+        end;
       TInstruction.f64_store:
-        if not memory.store_into_memory<double>(stack, pc) then
-          goto traps;
+        begin
+          var value := stack.Pop.f64;
+          if not CheckStore<Double> then goto traps;
+          StoreToMemory<Double>(value);
+        end;
       TInstruction.i32_store8, TInstruction.i64_store8:
-        if not memory.store_into_memory<Uint8>(stack, pc) then
-          goto traps;
+        begin
+          var value := stack.Pop.i64;
+          if not CheckStore<Uint8> then goto traps;
+          StoreToMemory<Uint8>(value);
+        end;
       TInstruction.i32_store16, TInstruction.i64_store16:
-        if not memory.store_into_memory<Uint16>(stack, pc) then
-          goto traps;
+        begin
+          var value := stack.Pop.i64;
+          if not CheckStore<Uint16> then goto traps;
+          StoreToMemory<Uint16>(value);
+        end;
       TInstruction.i64_store32:
-        if not memory.store_into_memory<Uint32>(stack, pc) then
-          goto traps;
+        begin
+          var value := stack.Pop.i64;
+          if not CheckStore<Uint32> then goto traps;
+          StoreToMemory<Uint32>(value);
+        end;
       TInstruction.memory_size:
         begin
           assert(memory.size mod PageSize = 0);
@@ -748,29 +809,29 @@ begin
       TInstruction.i64_ge_u:
         comparison_op(stack, std::greater_equal<Int64>);
        TInstruction.f32_eq:
-        comparison_op(stack, std::equal_to<float>);
+        comparison_op(stack, std::equal_to<Single>);
       TInstruction.f32_ne:
-        comparison_op(stack, std::not_equal_to<float>);
+        comparison_op(stack, std::not_equal_to<Single>);
       TInstruction.f32_lt:
-        comparison_op(stack, std::less<float>);
+        comparison_op(stack, std::less<Single>);
       TInstruction.f32_gt:
-        comparison_op<float>(stack, std::greater<float>);
+        comparison_op<Single>(stack, std::greater<Single>);
       TInstruction.f32_le:
-        comparison_op(stack, std::less_equal<float>);
+        comparison_op(stack, std::less_equal<Single>);
       TInstruction.f32_ge:
-        comparison_op(stack, std::greater_equal<float>);
+        comparison_op(stack, std::greater_equal<Single>);
       TInstruction.f64_eq:
-        comparison_op(stack, std::equal_to<double>);
+        comparison_op(stack, std::equal_to<Double>);
       TInstruction.f64_ne:
-        comparison_op(stack, std::not_equal_to<double>);
+        comparison_op(stack, std::not_equal_to<Double>);
       TInstruction.f64_lt:
-        comparison_op(stack, std::less<double>);
+        comparison_op(stack, std::less<Double>);
       TInstruction.f64_gt:
-        comparison_op<double>(stack, std::greater<double>);
+        comparison_op<Double>(stack, std::greater<Double>);
       TInstruction.f64_le:
-        comparison_op(stack, std::less_equal<double>);
+        comparison_op(stack, std::less_equal<Double>);
       TInstruction.f64_ge:
-        comparison_op(stack, std::greater_equal<double>);
+        comparison_op(stack, std::greater_equal<Double>);
       TInstruction.i32_clz:
          unary_op(stack, clz32);
       TInstruction.i32_ctz:
@@ -900,136 +961,167 @@ begin
         binary_op(stack, rotr<Int64>);
 
       TInstruction.f32_abs:
-        unary_op(stack, fabs<float>);
+        unary_op(stack, fabs<Single>);
       TInstruction.f32_neg:
-        unary_op(stack, fneg<float>);
+        unary_op(stack, fneg<Single>);
       TInstruction.f32_ceil:
-        unary_op(stack, fceil<float>);
+        unary_op(stack, fceil<Single>);
       TInstruction.f32_floor:
-        unary_op(stack, ffloor<float>);
+        unary_op(stack, ffloor<Single>);
       TInstruction.f32_trunc:
-          unary_op(stack, ftrunc<float>);
+          unary_op(stack, ftrunc<Single>);
       TInstruction.f32_nearest:
-        unary_op(stack, fnearest<float>);
+        unary_op(stack, fnearest<Single>);
       TInstruction.f32_sqrt:
-        unary_op(stack, static_cast<float ( *)(float)>(std::sqrt));
+        unary_op(stack, static_cast<Single ( *)(Single)>(std::sqrt));
 
       TInstruction.f32_add:
-        binary_op(stack, add<float>);
+        binary_op(stack, add<Single>);
       TInstruction.f32_sub:
-        binary_op(stack, sub<float>);
+        binary_op(stack, sub<Single>);
       TInstruction.f32_mul:
-        binary_op(stack, mul<float>);
+        binary_op(stack, mul<Single>);
       TInstruction.f32_div:
-        binary_op(stack, fdiv<float>);
+        binary_op(stack, fdiv<Single>);
       TInstruction.f32_min:
-        binary_op(stack, fmin<float>);
+        binary_op(stack, fmin<Single>);
       TInstruction.f32_max:
-        binary_op(stack, fmax<float>);
+        binary_op(stack, fmax<Single>);
       TInstruction.f32_copysign:
-        binary_op(stack, fcopysign<float>);
+        binary_op(stack, fcopysign<Single>);
 
       TInstruction.f64_abs:
-        unary_op(stack, fabs<double>);
+        unary_op(stack, fabs<Double>);
       TInstruction.f64_neg:
-        unary_op(stack, fneg<double>);
+        unary_op(stack, fneg<Double>);
       TInstruction.f64_ceil:
-        unary_op(stack, fceil<double>);
+        unary_op(stack, fceil<Double>);
       TInstruction.f64_floor:
-        unary_op(stack, ffloor<double>);
+        unary_op(stack, ffloor<Double>);
       TInstruction.f64_trunc:
-        unary_op(stack, ftrunc<double>);
+        unary_op(stack, ftrunc<Double>);
       TInstruction.f64_nearest:
-        unary_op(stack, fnearest<double>);
+        unary_op(stack, fnearest<Double>);
       TInstruction.f64_sqrt:
-        unary_op(stack, static_cast<double ( *)(double)>(std::sqrt));
+        unary_op(stack, static_cast<Double ( *)(Double)>(std::sqrt));
 
       TInstruction.f64_add:
-          binary_op(stack, add<double>);
+          binary_op(stack, add<Double>);
       TInstruction.f64_sub:
-        binary_op(stack, sub<double>);
+        binary_op(stack, sub<Double>);
       TInstruction.f64_mul:
-        binary_op(stack, mul<double>);
+        binary_op(stack, mul<Double>);
       TInstruction.f64_div:
-        binary_op(stack, fdiv<double>);
+        binary_op(stack, fdiv<Double>);
       TInstruction.f64_min:
-        binary_op(stack, fmin<double>);
+        binary_op(stack, fmin<Double>);
       TInstruction.f64_max:
-        binary_op(stack, fmax<double>);
+        binary_op(stack, fmax<Double>);
       TInstruction.f64_copysign:
-        binary_op(stack, fcopysign<double>);
+        binary_op(stack, fcopysign<Double>);
 
       TInstruction.i32_wrap_i64:
         stack.top := static_cast<Uint32>(stack.top.i64);
       TInstruction.i32_trunc_f32_s:
-        if not trunc<float, Int32>(stack) then
+        if not trunc<Single, Int32>(stack) then
             goto traps;
       TInstruction.i32_trunc_f32_u:
-        if not trunc<float, Uint32>(stack) then
+        if not trunc<Single, Uint32>(stack) then
           goto traps;
       TInstruction.i32_trunc_f64_s:
-        if not trunc<double, Int32>(stack) then
+        if not trunc<Double, Int32>(stack) then
           goto traps;
       TInstruction.i32_trunc_f64_u:
-        if not trunc<double, Uint32>(stack) then
+        if not trunc<Double, Uint32>(stack) then
           goto traps;
       TInstruction.i64_extend_i32_s:
         stack.top := int64(stack.top.as<Int32>);
       TInstruction.i64_extend_i32_u:
         stack.top := uint64(stack.top.i32); then
       TInstruction.i64_trunc_f32_s:
-        if not trunc<float, int64_t>(stack) then
+        if not trunc<Single, int64_t>(stack) then
             goto traps;
       TInstruction.i64_trunc_f32_u:
-        if not trunc<float, Int64>(stack) then
+        if not trunc<Single, Int64>(stack) then
             goto traps;
       TInstruction.i64_trunc_f64_s:
-        if not trunc<double, int64_t>(stack) then
+        if not trunc<Double, int64_t>(stack) then
             goto traps;
       TInstruction.i64_trunc_f64_u:
-        if (not trunc<double, Int64>(stack))
+        if (not trunc<Double, Int64>(stack))
             goto traps;
       TInstruction.f32_convert_i32_s:
-        convert<Int32, float>(stack);
+        convert<Int32, Single>(stack);
       TInstruction.f32_convert_i32_u:
-        convert<Uint32, float>(stack);
+        convert<Uint32, Single>(stack);
       TInstruction.f32_convert_i64_s:
-        convert<int64_t, float>(stack);
+        convert<int64_t, Single>(stack);
       TInstruction.f32_convert_i64_u:
-        convert<Int64, float>(stack);
+        convert<Int64, Single>(stack);
       TInstruction.f32_demote_f64:
         stack.top = demote(stack.top.f64);
       TInstruction.f64_convert_i32_s:
-        convert<Int32, double>(stack);
+        convert<Int32, Double>(stack);
       TInstruction.f64_convert_i32_u:
-        convert<Uint32, double>(stack);
+        convert<Uint32, Double>(stack);
       TInstruction.f64_convert_i64_s:
-        convert<int64_t, double>(stack);
+        convert<int64_t, Double>(stack);
       TInstruction.f64_convert_i64_u:
-        convert<Int64, double>(stack);
+        convert<Int64, Double>(stack);
       TInstruction.f64_promote_f32:
         stack.top = doublebeginstack.top.f32end;;
       TInstruction.i32_reinterpret_f32:
-        reinterpret<float, Uint32>(stack);
+        reinterpret<Single, Uint32>(stack);
       TInstruction.i64_reinterpret_f64:
-        reinterpret<double, Int64>(stack);
+        reinterpret<Double, Int64>(stack);
       TInstruction.f32_reinterpret_i32:
-        reinterpret<Uint32, float>(stack);
+        reinterpret<Uint32, Single>(stack);
       TInstruction.f64_reinterpret_i64:
-        reinterpret<Int64, double>(stack);
+        reinterpret<Int64, Double>(stack);
       else
         assert(False, 'unreachable')
     end;
+  until False;
 ends:
-    assert(pc = &code.instructions[code.instructions.size]);  // End of code must be reached.
-    assert(stack.size = instance.module.get_function_type(func_idx).outputs.size);
+  assert(pc = &code.instructions[code.instructions.size]);
+  // End of code must be reached.
+  assert(stack.size = instance.module.get_function_type(func_idx).outputs.size);
 
-    if stack.size <> 0 then
-      exit(ExecutionResultbeginstack.top)
-    else
-      exit(Void);
+  if stack.size <> 0 then
+    exit(ExecutionResultbeginstack.top)
+  else
+    exit(Void);
 traps:
     exit(Trap);
+end;
+
+{$EndRegion}
+
+{$Region 'execute functions'}
+
+function Execute(instance: PInstance; func_idx: TFuncIdx;
+  const args: PValue): TExecutionResult; inline; overload;
+var
+  ctx: TExecutionContext;
+begin
+  Result := execute(instance, func_idx, args, ctx);
+end;
+
+function Execute(instance: PInstance; func_idx: TFuncIdx;
+  const args: PValue; var ctx: TExecutionContext): TExecutionResult;
+var
+  vm: TVm;
+begin
+  Assert(ctx.depth >= 0);
+  if ctx.depth >= CallStackLimit then
+    exit(Trap);
+
+  Assert(Length(instance.module.imported_function_types) = Length(instance.imported_functions));
+  if func_idx < Cardinal(Length(instance.imported_functions)) then
+    exit(instance.imported_functions[func_idx].func.Call(instance, args, ctx));
+
+  vm.Init(instance, func_idx, args);
+  vm.Execute;
 end;
 
 {$EndRegion}

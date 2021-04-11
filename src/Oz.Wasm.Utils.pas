@@ -65,6 +65,7 @@ type
 
 {$Region 'TOperandStack'}
 
+  POperandStack = ^TOperandStack;
   TOperandStack = record
   const
     SmallStorageSize = 128 div sizeof(TValue);
