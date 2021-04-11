@@ -204,7 +204,7 @@ type
     function LoadFromMemory<T: record>: T; inline;
     function CheckStore<DstT>: Boolean; inline;
     procedure StoreToMemory<T>(const value: T);
-    procedure Branch(arity: Uint32);
+    procedure Branch(arity: Uint32); inline;
     // Increases the size of memory by delta_pages.
     function GrowMemory(deltaPages, memoryPagesLimit: Uint32): Uint32; inline;
   public
@@ -790,73 +790,201 @@ begin
       TInstruction.i32_eqz:
         stack.top.i32 := Uint32(stack.top.AsUint32 = 0);
       TInstruction.i32_eq:
-        comparison_op(stack, std::equal_to<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := Ord(a = b);
+        end;
       TInstruction.i32_ne:
-        comparison_op(stack, std::not_equal_to<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := Ord(a <> b);
+        end;
       TInstruction.i32_lt_s:
-        comparison_op(stack, std::less<Int32>);
+        begin
+          var a := stack.pop.AsInt32;
+          var b := stack.top.AsInt32;
+          stack.top.i32 := Ord(a < b);
+        end;
       TInstruction.i32_lt_u:
-        comparison_op(stack, std::less<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := Ord(a < b);
+        end;
       TInstruction.i32_gt_s:
-        comparison_op(stack, std::greater<Int32>);
+        begin
+          var a := stack.pop.AsInt32;
+          var b := stack.top.AsInt32;
+          stack.top.i32 := Ord(a > b);
+        end;
       TInstruction.i32_gt_u:
-        comparison_op(stack, std::greater<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := Ord(a > b);
+        end;
       TInstruction.i32_le_s:
-        comparison_op(stack, std::less_equal<Int32>);
+        begin
+          var a := stack.pop.AsInt32;
+          var b := stack.top.AsInt32;
+          stack.top.i32 := Ord(a <= b);
+        end;
       TInstruction.i32_le_u:
-        comparison_op(stack, std::less_equal<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := Ord(a <= b);
+        end;
       TInstruction.i32_ge_s:
-        comparison_op(stack, std::greater_equal<Int32>);
+        begin
+          var a := stack.pop.AsInt32;
+          var b := stack.top.AsInt32;
+          stack.top.i32 := Ord(a >= b);
+        end;
       TInstruction.i32_ge_u:
-        comparison_op(stack, std::greater_equal<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := Ord(a >= b);
+        end;
       TInstruction.i64_eqz:
-        stack.top = Uint32(stack.top.i64 = 0);
+        stack.top.i32 := Ord(stack.top.i64 = 0);
       TInstruction.i64_eq:
-        comparison_op(stack, std::equal_to<Int64>);
+        begin
+          var a := stack.pop.AsInt64;
+          var b := stack.top.AsInt64;
+          stack.top.i32 := Ord(a = b);
+        end;
       TInstruction.i64_ne:
-        comparison_op(stack, std::not_equal_to<Int64>);
+        begin
+          var a := stack.pop.AsInt64;
+          var b := stack.top.AsInt64;
+          stack.top.i32 := Ord(a <> b);
+        end;
       TInstruction.i64_lt_s:
-        comparison_op(stack, std::less<int64_t>);
+        begin
+          var a := stack.pop.AsUint64;
+          var b := stack.top.AsUint64;
+          stack.top.i32 := Ord(a < b);
+        end;
       TInstruction.i64_lt_u:
-        comparison_op(stack, std::less<Int64>);
+        begin
+          var a := stack.pop.AsInt64;
+          var b := stack.top.AsInt64;
+          stack.top.i32 := Ord(a < b);
+        end;
       TInstruction.i64_gt_s:
-        comparison_op(stack, std::greater<int64_t>);
+        begin
+          var a := stack.pop.AsUint64;
+          var b := stack.top.AsUint64;
+          stack.top.i32 := Ord(a > b);
+        end;
       TInstruction.i64_gt_u:
-        comparison_op(stack, std::greater<Int64>);
+        begin
+          var a := stack.pop.AsInt64;
+          var b := stack.top.AsInt64;
+          stack.top.i32 := Ord(a > b);
+        end;
       TInstruction.i64_le_s:
-        comparison_op(stack, std::less_equal<int64_t>);
+        begin
+          var a := stack.pop.AsUint64;
+          var b := stack.top.AsUint64;
+          stack.top.i32 := Ord(a <= b);
+        end;
       TInstruction.i64_le_u:
-        comparison_op(stack, std::less_equal<Int64>);
+        begin
+          var a := stack.pop.AsInt64;
+          var b := stack.top.AsInt64;
+          stack.top.i32 := Ord(a <= b);
+        end;
       TInstruction.i64_ge_s:
-        comparison_op(stack, std::greater_equal<int64_t>);
+        begin
+          var a := stack.pop.AsUint64;
+          var b := stack.top.AsUint64;
+          stack.top.i32 := Ord(a >= b);
+        end;
       TInstruction.i64_ge_u:
-        comparison_op(stack, std::greater_equal<Int64>);
-       TInstruction.f32_eq:
-        comparison_op(stack, std::equal_to<Single>);
+        begin
+          var a := stack.pop.AsInt64;
+          var b := stack.top.AsInt64;
+          stack.top.i32 := Ord(a >= b);
+        end;
+      TInstruction.f32_eq:
+        begin
+          var a := stack.pop.AsSingle;
+          var b := stack.top.AsSingle;
+          stack.top.i32 := SameValue(a, b);
+        end;
       TInstruction.f32_ne:
-        comparison_op(stack, std::not_equal_to<Single>);
+        begin
+          var a := stack.pop.AsSingle;
+          var b := stack.top.AsSingle;
+          stack.top.i32 := not SameValue(a, b);
+        end;
       TInstruction.f32_lt:
-        comparison_op(stack, std::less<Single>);
+        begin
+          var a := stack.pop.AsSingle;
+          var b := stack.top.AsSingle;
+          stack.top.i32 := a < b;
+        end;
       TInstruction.f32_gt:
-        comparison_op<Single>(stack, std::greater<Single>);
+        begin
+          var a := stack.pop.AsSingle;
+          var b := stack.top.AsSingle;
+          stack.top.i32 := a > b;
+        end;
       TInstruction.f32_le:
-        comparison_op(stack, std::less_equal<Single>);
+        begin
+          var a := stack.pop.AsSingle;
+          var b := stack.top.AsSingle;
+          stack.top.i32 := a <= b;
+        end;
       TInstruction.f32_ge:
-        comparison_op(stack, std::greater_equal<Single>);
+        begin
+          var a := stack.pop.AsSingle;
+          var b := stack.top.AsSingle;
+          stack.top.i32 := a >= b;
+        end;
       TInstruction.f64_eq:
-        comparison_op(stack, std::equal_to<Double>);
+        begin
+          var a := stack.pop.AsDouble;
+          var b := stack.top.AsDouble;
+          stack.top.i32 := SameValue(a, b);
+        end;
       TInstruction.f64_ne:
-        comparison_op(stack, std::not_equal_to<Double>);
+        begin
+          var a := stack.pop.AsDouble;
+          var b := stack.top.AsDouble;
+          stack.top.i32 := not SameValue(a, b);
+        end;
       TInstruction.f64_lt:
-        comparison_op(stack, std::less<Double>);
+        begin
+          var a := stack.pop.AsDouble;
+          var b := stack.top.AsDouble;
+          stack.top.i32 := a < b;
+        end;
       TInstruction.f64_gt:
-        comparison_op<Double>(stack, std::greater<Double>);
+        begin
+          var a := stack.pop.AsDouble;
+          var b := stack.top.AsDouble;
+          stack.top.i32 := a > b;
+        end;
       TInstruction.f64_le:
-        comparison_op(stack, std::less_equal<Double>);
+        begin
+          var a := stack.pop.AsDouble;
+          var b := stack.top.AsDouble;
+          stack.top.i32 := a <= b;
+        end;
       TInstruction.f64_ge:
-        comparison_op(stack, std::greater_equal<Double>);
+        begin
+          var a := stack.pop.AsDouble;
+          var b := stack.top.AsDouble;
+          stack.top.i32 := a >= b;
+        end;
       TInstruction.i32_clz:
-         unary_op(stack, clz32);
+        unary_op(stack, clz32);
       TInstruction.i32_ctz:
         unary_op(stack, ctz32);
       TInstruction.i32_popcnt:
