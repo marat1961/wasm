@@ -83,7 +83,9 @@ type
     function Size: Integer;
     // Pushes an item on the stack.
     // The stack max height limit is not checked.
-    procedure Push(Item: TValue);
+    procedure Push(Item: TValue); overload;
+    procedure Push(value: Uint64); overload;
+    procedure Push(value: Uint32); overload;
     // Returns the reference to the top item.
     // Requires non-empty stack.
     function Top: PValue;
@@ -263,6 +265,18 @@ procedure TOperandStack.Push(Item: TValue);
 begin
   Inc(FTop, sizeof(TValue));
   FTop^ := Item;
+end;
+
+procedure TOperandStack.Push(value: Uint32);
+begin
+  Inc(FTop, sizeof(TValue));
+  FTop.i32 := value;
+end;
+
+procedure TOperandStack.Push(value: Uint64);
+begin
+  Inc(FTop, sizeof(TValue));
+  FTop.i64 := value;
 end;
 
 function TOperandStack.rbegin: PValue;

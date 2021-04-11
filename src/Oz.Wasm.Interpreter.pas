@@ -200,12 +200,13 @@ type
     stack: TOperandStack;
     pc: PByte;
     vi: Uint64;
-    function GetMemory: PByte;
     function CheckLoad<SrcT>: Boolean; inline;
     function LoadFromMemory<T: record>: T; inline;
     function CheckStore<DstT>: Boolean; inline;
     procedure StoreToMemory<T>(const value: T);
     procedure Branch(arity: Uint32);
+    // Increases the size of memory by delta_pages.
+    function GrowMemory(deltaPages, memoryPagesLimit: Uint32): Uint32; inline;
   public
     procedure Init(instance: PInstance; func_idx: TFuncIdx; const args: PValue);
     procedure Execute(var ctx: TExecutionContext);
@@ -463,6 +464,28 @@ begin
   end
   else
     stack.drop(stack_drop);
+end;
+
+function TVm.GrowMemory(deltaPages, memoryPagesLimit: Uint32): Uint32;
+begin
+  var curPages := Length(memory) div PageSize;
+  // These Assertions are guaranteed by allocation in instantiate
+  // and this function for subsequent increases.
+  Assert(Length(memory) mod PageSize = 0);
+  Assert(memoryPagesLimit <= MaxMemoryPagesLimit);
+  Assert(curPages <= memoryPagesLimit);
+  var newPages := Uint64(curPages) + deltaPages;
+  if newPages > memoryPagesLimit then
+    exit(Uint32(-1));
+  try
+    // newPages <= memory_pages_limit <= MaxMemoryPagesLimit guarantees multiplication
+    // will not overflow Uint32.
+    Assert(newPages * PageSize <= Uint32.MaxValue);
+    SetLength(memory, newPages * PageSize);
+    exit(Uint32(curPages));
+  except
+    exit(Uint32(-1));
+  end;
 end;
 
 function invoke_function(const func_type: TFuncType; func_idx: Uint32;
@@ -749,11 +772,11 @@ begin
         end;
       TInstruction.memory_size:
         begin
-          assert(memory.size mod PageSize = 0);
-          stack.push(Uint32(memory.size / PageSize));
+          assert(Length(memory) mod PageSize = 0);
+          stack.push(TValue.From(Uint32(Length(memory) div PageSize)));
         end;
       TInstruction.memory_grow:
-        stack.top := grow_memory(memory^, stack.top.AsUint32, instance.memory_pages_limit);
+        stack.top.i64 := GrowMemory(stack.top.AsUint32, instance.memory_pages_limit);
       TInstruction.i32_const, TInstruction.f32_const:
         begin
           var value := pc.read<Uint32>;
@@ -761,11 +784,11 @@ begin
         end;
       TInstruction.i64_const, TInstruction.f64_const:
         begin
-          var value := read<Int64>(pc);
+          var value := pc.read<Int64>;
           stack.push(value);
         end;
       TInstruction.i32_eqz:
-        stack.top = Uint32(stack.top.AsUint32 = 0);
+        stack.top.i32 := Uint32(stack.top.AsUint32 = 0);
       TInstruction.i32_eq:
         comparison_op(stack, std::equal_to<Uint32>);
       TInstruction.i32_ne:
