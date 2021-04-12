@@ -193,6 +193,11 @@ type
 {$Region 'TVm'}
 
   TVm = record
+  const
+    F32AbsMask: Uint32 = $7fffffff;
+    F32SignMask: Uint32 = Uint32(not $7fffffff);
+    F64AbsMask: Uint64 = $fffffffffffffff;
+    F64SignMask: Uint64 = Uint64(not $fffffffffffffff);
   private
     instance: PInstance;
     code: TCode;
@@ -1228,7 +1233,7 @@ begin
           if rhs = 0 then
             goto traps;
           var lhs := stack.top.AsUint64;
-          if (lhs = Uint32.MinValue) and (rhs = -1) then
+          if (lhs = Uint64.MinValue) and (rhs = -1) then
             stack.top.i64 := 0
           else
             stack.top.i64 := lhs mod rhs;
@@ -1291,17 +1296,29 @@ begin
         end;
 
       TInstruction.f32_abs:
-        unary_op(stack, fabs<Single>);
+        stack.top.f32 := Abs(stack.top.f32);
       TInstruction.f32_neg:
-        unary_op(stack, fneg<Single>);
+        stack.top.f32 := stack.top.i32 xor F32SignMask;
       TInstruction.f32_ceil:
-        unary_op(stack, fceil<Single>);
+        if stack.top.AsSingle.IsNan then
+          stack.top.f32 := Single.NaN
+        else
+          stack.top.f32 := Ceil(stack.top.AsSingle);
       TInstruction.f32_floor:
-        unary_op(stack, ffloor<Single>);
+        if stack.top.AsSingle.IsNan then
+          stack.top.f32 := Single.NaN
+        else
+          stack.top.f32 := Floor(stack.top.AsSingle);
       TInstruction.f32_trunc:
-          unary_op(stack, ftrunc<Single>);
+        if stack.top.AsSingle.IsNan then
+          stack.top.f32 := Single.NaN
+        else
+          stack.top.f32 := Trunc(stack.top.AsSingle);
       TInstruction.f32_nearest:
-        unary_op(stack, fnearest<Single>);
+        if stack.top.AsSingle.IsNan then
+          stack.top.f32 := Single.NaN
+        else
+          stack.top.f32 := SimpleRoundTo(stack.top.AsSingle, 0);
       TInstruction.f32_sqrt:
         unary_op(stack, static_cast<Single ( *)(Single)>(std::sqrt));
 
@@ -1323,7 +1340,7 @@ begin
       TInstruction.f64_abs:
         unary_op(stack, fabs<Double>);
       TInstruction.f64_neg:
-        unary_op(stack, fneg<Double>);
+        stack.top.i64 := stack.top.i64 xor F64SignMask;
       TInstruction.f64_ceil:
         unary_op(stack, fceil<Double>);
       TInstruction.f64_floor:
