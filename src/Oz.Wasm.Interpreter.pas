@@ -7,7 +7,7 @@ unit Oz.Wasm.Interpreter;
 interface
 
 uses
-  System.SysUtils, Oz.Wasm.Utils, Oz.Wasm.Limits, Oz.Wasm.Module,
+  System.SysUtils, System.Math, Oz.Wasm.Utils, Oz.Wasm.Limits, Oz.Wasm.Module,
   Oz.Wasm.Value, Oz.Wasm.Types, Oz.Wasm.Instruction;
 
 {$T+}
@@ -247,6 +247,89 @@ function Execute(instance: PInstance; func_idx: TFuncIdx;
 {$EndRegion}
 
 implementation
+
+function __builtin_clz(x: Uint32): Uint32;
+{$IF Defined(CPUX64)}
+asm
+  BSR     ECX,ECX
+  NEG     ECX
+  ADD     ECX,31
+  MOV     EAX,ECX
+{$ENDIF}
+{$IF Defined(CPUX86)}
+asm
+  BSR     EAX,EAX
+  NEG     EAX
+  ADD     EAX,31
+{$ENDIF}
+end;
+
+function __builtin_ctz(x: Uint32): Uint32;
+begin
+
+end;
+
+function popcount(x: Uint32): Uint32; overload;
+begin
+
+end;
+
+function __builtin_clzll(x: Uint64): Uint64;
+begin
+
+end;
+
+function __builtin_ctzll(x: Uint64): Uint64;
+begin
+
+end;
+
+function popcount(x: Uint64): Uint64; overload;
+begin
+
+end;
+
+function clz32(value: Uint64): Uint64; inline;
+begin
+  if value = 0 then
+    Result := 32
+  else
+    Result := __builtin_clz(value);
+end;
+
+function ctz32(value: Uint32): Uint32; inline;
+begin
+  if value = 0 then
+    Result := 32
+  else
+    Result := __builtin_ctz(value);
+end;
+
+function popcnt32(value: Uint32): Uint32; inline;
+begin
+  Result := popcount(value);
+end;
+
+function clz64(value: Uint64): Uint64; inline;
+begin
+  if value = 0 then
+    Result := 64
+  else
+    Result := __builtin_clzll(value);
+end;
+
+function ctz64(value: Uint64): Uint64; inline;
+begin
+  if value = 0 then
+    Result := 64
+  else
+    Result := __builtin_ctzll(value);
+end;
+
+function popcnt64(value: Uint64): Uint64; inline;
+begin
+  Result := popcount(value);
+end;
 
 {$Region 'TExecutionResult'}
 
@@ -915,112 +998,124 @@ begin
         begin
           var a := stack.pop.AsSingle;
           var b := stack.top.AsSingle;
-          stack.top.i32 := SameValue(a, b);
+          stack.top.i32 := Ord(SameValue(a, b));
         end;
       TInstruction.f32_ne:
         begin
           var a := stack.pop.AsSingle;
           var b := stack.top.AsSingle;
-          stack.top.i32 := not SameValue(a, b);
+          stack.top.i32 := Ord(not SameValue(a, b));
         end;
       TInstruction.f32_lt:
         begin
           var a := stack.pop.AsSingle;
           var b := stack.top.AsSingle;
-          stack.top.i32 := a < b;
+          stack.top.i32 := Ord(a < b);
         end;
       TInstruction.f32_gt:
         begin
           var a := stack.pop.AsSingle;
           var b := stack.top.AsSingle;
-          stack.top.i32 := a > b;
+          stack.top.i32 := Ord(a > b);
         end;
       TInstruction.f32_le:
         begin
           var a := stack.pop.AsSingle;
           var b := stack.top.AsSingle;
-          stack.top.i32 := a <= b;
+          stack.top.i32 := Ord(a <= b);
         end;
       TInstruction.f32_ge:
         begin
           var a := stack.pop.AsSingle;
           var b := stack.top.AsSingle;
-          stack.top.i32 := a >= b;
+          stack.top.i32 := Ord(a >= b);
         end;
       TInstruction.f64_eq:
         begin
           var a := stack.pop.AsDouble;
           var b := stack.top.AsDouble;
-          stack.top.i32 := SameValue(a, b);
+          stack.top.i32 := Ord(SameValue(a, b));
         end;
       TInstruction.f64_ne:
         begin
           var a := stack.pop.AsDouble;
           var b := stack.top.AsDouble;
-          stack.top.i32 := not SameValue(a, b);
+          stack.top.i32 := Ord(not SameValue(a, b));
         end;
       TInstruction.f64_lt:
         begin
           var a := stack.pop.AsDouble;
           var b := stack.top.AsDouble;
-          stack.top.i32 := a < b;
+          stack.top.i32 := Ord(a < b);
         end;
       TInstruction.f64_gt:
         begin
           var a := stack.pop.AsDouble;
           var b := stack.top.AsDouble;
-          stack.top.i32 := a > b;
+          stack.top.i32 := Ord(a > b);
         end;
       TInstruction.f64_le:
         begin
           var a := stack.pop.AsDouble;
           var b := stack.top.AsDouble;
-          stack.top.i32 := a <= b;
+          stack.top.i32 := Ord(a <= b);
         end;
       TInstruction.f64_ge:
         begin
           var a := stack.pop.AsDouble;
           var b := stack.top.AsDouble;
-          stack.top.i32 := a >= b;
+          stack.top.i32 := Ord(a >= b);
         end;
       TInstruction.i32_clz:
-        unary_op(stack, clz32);
+        stack.top.i32 := clz32(stack.top.i32);
       TInstruction.i32_ctz:
-        unary_op(stack, ctz32);
+        stack.top.i32 := ctz32(stack.top.i32);
       TInstruction.i32_popcnt:
-        unary_op(stack, popcnt32);
+        stack.top.i32 := popcount(stack.top.i32);
       TInstruction.i32_add:
-        binary_op(stack, add<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := a + b;
+        end;
       TInstruction.i32_sub:
-        binary_op(stack, sub<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := a - b;
+        end;
       TInstruction.i32_mul:
-        binary_op(stack, mul<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := a * b;
+        end;
       TInstruction.i32_div_s:
-      begin
-        var rhs := stack.pop.as<Int32>;
-        var lhs := stack.top.as<Int32>;
-        if (rhs = 0) or (lhs = std::numeric_limits<Int32>::min) and (rhs = -1) then
-          goto traps;
-        stack.top := div(lhs, rhs);
-      end;
+        begin
+          var rhs := stack.pop.AsInt32;
+          var lhs := stack.top.AsInt32;
+          if (rhs = 0) or (lhs = Int32.MinValue) and (rhs = -1) then
+            goto traps;
+          stack.top.i32 := lhs div rhs;
+        end;
       TInstruction.i32_div_u:
-      begin
-        var rhs := stack.pop.AsUint32;
-        if rhs = 0 then
-          goto traps;
-        var lhs := stack.top.AsUint32;
-        stack.top := div(lhs, rhs);
-      end;
+        begin
+          var rhs := stack.pop.AsUint32;
+          if rhs = 0 then
+            goto traps;
+          var lhs := stack.top.AsUint32;
+          stack.top.i32 := lhs div rhs;
+        end;
       TInstruction.i32_rem_s:
       begin
-        var rhs := stack.pop.as<Int32>;
+        var rhs := stack.pop.AsInt32;
         if rhs = 0 then
           goto traps;
-        var lhs := stack.top.as<Int32>;
-        if (lhs = std::numeric_limits<Int32>::min) and (rhs = -1) then
-          stack.top := int32_tbegin0end;;
+        var lhs := stack.top.AsInt32;
+        if (lhs = Int32.MinValue) and (rhs = -1) then
+          stack.top.i32 := 0
         else
-          stack.top := rem(lhs, rhs);
+          stack.top.i32 := lhs mod rhs;
       end;
       TInstruction.i32_rem_u:
       begin
@@ -1028,7 +1123,7 @@ begin
         if rhs = 0 then
           goto traps;
         var lhs := stack.top.AsUint32;
-        stack.top := rem(lhs, rhs);
+        stack.top.i32 := lhs mod rhs;
       end;
       TInstruction.i32_and:
         binary_op(stack, std::bit_and<Uint32>);
