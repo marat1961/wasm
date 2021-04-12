@@ -248,6 +248,24 @@ function Execute(instance: PInstance; func_idx: TFuncIdx;
 
 implementation
 
+function rotl(lhs, rhs: Uint32): Uint32;
+const
+  num_bits = sizeof(Uint32);
+begin
+  var k := rhs and (num_bits - 1);
+  if k = 0 then exit(lhs);
+  Result := (lhs shl k) or (lhs shr (num_bits - k));
+end;
+
+function rotr(lhs, rhs: Uint32): Uint32;
+const
+  num_bits = sizeof(Uint32);
+begin
+  var k := rhs and (num_bits - 1);
+  if k = 0 then exit(lhs);
+  Result := (lhs shr k) or (lhs shl (num_bits - k));
+end;
+
 function __builtin_clz(x: Uint32): Uint32;
 {$IF Defined(CPUX64)}
 asm
@@ -1126,21 +1144,53 @@ begin
         stack.top.i32 := lhs mod rhs;
       end;
       TInstruction.i32_and:
-        binary_op(stack, std::bit_and<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := a and b;
+        end;
       TInstruction.i32_or:
-        binary_op(stack, std::bit_or<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := a or b;
+        end;
       TInstruction.i32_xor:
-        binary_op(stack, std::bit_xor<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32;
+          stack.top.i32 := a xor b;
+        end;
       TInstruction.i32_shl:
-        binary_op(stack, shift_left<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32 and (sizeof(Uint32) * 8 - 1);
+          stack.top.i32 := a shl b;
+        end;
       TInstruction.i32_shr_s:
-        binary_op(stack, shift_right<Int32>);
+        begin
+          var a := stack.pop.AsInt32;
+          var b := stack.top.AsInt32 and (sizeof(Int32) * 8 - 1);
+          stack.top.i32 := a shr b;
+        end;
       TInstruction.i32_shr_u:
-        binary_op(stack, shift_right<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32 and (sizeof(Uint32) * 8 - 1);
+          stack.top.i32 := a shr b;
+        end;
       TInstruction.i32_rotl:
-        binary_op(stack, rotl<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32 and (sizeof(Uint32) * 8 - 1);
+          stack.top.i32 := rotl(a, b);
+        end;
       TInstruction.i32_rotr:
-        binary_op(stack, rotr<Uint32>);
+        begin
+          var a := stack.pop.AsUint32;
+          var b := stack.top.AsUint32 and (sizeof(Uint32) * 8 - 1);
+          stack.top.i32 := rotr(a, b);
+        end;
 
       TInstruction.i64_clz:
         unary_op(stack, clz64);
