@@ -1443,17 +1443,47 @@ begin
           stack.top.f64 := a / b;
         end;
       TInstruction.f64_min:
-        binary_op(stack, fmin<Double>);
+        begin
+          var a: Double := stack.pop.AsDouble;
+          var b: Double := stack.top.AsDouble;
+          if a.IsNan or b.IsNan then
+            stack.top.f64 := Double.NaN
+          else if (a = 0) and (b = 0) and
+            ((Tv64(a).i64 and F64SignMask <> 0) or
+             (Tv64(b).i64 and F64SignMask <> 0)) then
+            stack.top.f64 := -0.0
+          else if b < a then
+            stack.top.f64 := b
+          else
+            stack.top.f64 := a;
+        end;
       TInstruction.f64_max:
-        binary_op(stack, fmax<Double>);
+        begin
+          var a: Double := stack.pop.AsDouble;
+          var b: Double := stack.top.AsDouble;
+          if a.IsNan or b.IsNan then
+            stack.top.f64 := Double.NaN
+          else if (a = 0) and (b = 0) and
+            ((Tv64(a).i64 and F64SignMask <> 0) or
+             (Tv64(b).i64 and F64SignMask <> 0)) then
+            stack.top.f64 := -0.0
+          else if a < b then
+            stack.top.f64 := b
+          else
+            stack.top.f64 := a;
+        end;
       TInstruction.f64_copysign:
-        binary_op(stack, fcopysign<Double>);
+        begin
+          var a := stack.pop.i64;
+          var b := stack.top.i64 and F64SignMask;
+          stack.top.i64 := (a and F64AbsMask) or b;
+        end;
 
       TInstruction.i32_wrap_i64:
-        stack.top := static_cast<Uint32>(stack.top.i64);
+        stack.top.i32 := Uint32(stack.top.i64);
       TInstruction.i32_trunc_f32_s:
         if not trunc<Single, Int32>(stack) then
-            goto traps;
+          goto traps;
       TInstruction.i32_trunc_f32_u:
         if not trunc<Single, Uint32>(stack) then
           goto traps;
@@ -1469,16 +1499,16 @@ begin
         stack.top := uint64(stack.top.i32); then
       TInstruction.i64_trunc_f32_s:
         if not trunc<Single, int64_t>(stack) then
-            goto traps;
+          goto traps;
       TInstruction.i64_trunc_f32_u:
         if not trunc<Single, Int64>(stack) then
-            goto traps;
+          goto traps;
       TInstruction.i64_trunc_f64_s:
         if not trunc<Double, int64_t>(stack) then
-            goto traps;
+          goto traps;
       TInstruction.i64_trunc_f64_u:
         if (not trunc<Double, Int64>(stack))
-            goto traps;
+          goto traps;
       TInstruction.f32_convert_i32_s:
         convert<Int32, Single>(stack);
       TInstruction.f32_convert_i32_u:
