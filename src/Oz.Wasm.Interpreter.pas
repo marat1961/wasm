@@ -198,6 +198,17 @@ type
     F32SignMask: Uint32 = Uint32(not $7fffffff);
     F64AbsMask: Uint64 = $fffffffffffffff;
     F64SignMask: Uint64 = Uint64(not $fffffffffffffff);
+  type
+    Tv32 = record
+      case Integer of
+        1: (i32: Uint32);
+        2: (f32: Single);
+    end;
+    Tv64 = record
+      case Integer of
+        1: (i64: Uint64);
+        2: (f64: Double);
+    end;
   private
     instance: PInstance;
     code: TCode;
@@ -1320,18 +1331,46 @@ begin
         else
           stack.top.f32 := SimpleRoundTo(stack.top.AsSingle, 0);
       TInstruction.f32_sqrt:
-        unary_op(stack, static_cast<Single ( *)(Single)>(std::sqrt));
-
+        stack.top.f32 := Sqrt(stack.top.AsSingle);
       TInstruction.f32_add:
-        binary_op(stack, add<Single>);
+        begin
+          var a := stack.pop.AsSingle;
+          var b := stack.top.AsSingle;
+          stack.top.f32 := a + b;
+        end;
       TInstruction.f32_sub:
-        binary_op(stack, sub<Single>);
+        begin
+          var a := stack.pop.AsSingle;
+          var b := stack.top.AsSingle;
+          stack.top.f32 := a - b;
+        end;
       TInstruction.f32_mul:
-        binary_op(stack, mul<Single>);
+        begin
+          var a := stack.pop.AsSingle;
+          var b := stack.top.AsSingle;
+          stack.top.f32 := a * b;
+        end;
       TInstruction.f32_div:
-        binary_op(stack, fdiv<Single>);
+        begin
+          var a := stack.pop.AsSingle;
+          var b := stack.top.AsSingle;
+          stack.top.f32 := a / b;
+        end;
       TInstruction.f32_min:
-        binary_op(stack, fmin<Single>);
+        begin
+          var a: Single := stack.pop.AsSingle;
+          var b: Single := stack.top.AsSingle;
+          if a.IsNan or b.IsNan then
+            stack.top.f32 := Single.NaN
+          else if (a = 0) and (b = 0) and
+            ((Tv32(a).i32 and F32SignMask <> 0) or
+             (Tv32(b).i32 and F32SignMask <> 0)) then
+            stack.top.f32 := -0.0
+          else if b < a then
+            stack.top.f32 := b
+          else
+            stack.top.f32 := a;
+        end;
       TInstruction.f32_max:
         binary_op(stack, fmax<Single>);
       TInstruction.f32_copysign:

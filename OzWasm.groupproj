@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{FF81E558-F7BC-424D-B58F-79AE89A3CF97}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="Wasm.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="test\WasmTests.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="Wasm">
+        <MSBuild Projects="Wasm.dproj"/>
+    </Target>
+    <Target Name="Wasm:Clean">
+        <MSBuild Projects="Wasm.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Wasm:Make">
+        <MSBuild Projects="Wasm.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="WasmTests">
+        <MSBuild Projects="test\WasmTests.dproj"/>
+    </Target>
+    <Target Name="WasmTests:Clean">
+        <MSBuild Projects="test\WasmTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="WasmTests:Make">
+        <MSBuild Projects="test\WasmTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="Wasm;WasmTests"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="Wasm:Clean;WasmTests:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="Wasm:Make;WasmTests:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
