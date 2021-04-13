@@ -1482,53 +1482,85 @@ begin
       TInstruction.i32_wrap_i64:
         stack.top.i32 := Uint32(stack.top.i64);
       TInstruction.i32_trunc_f32_s:
-        if not trunc<Single, Int32>(stack) then
-          goto traps;
+        begin
+          var a := stack.top.f32;
+          if not (a > -2147483904.0) and (a < 2147483648.0) then
+            goto traps;
+          stack.top.i32 := trunc(a);
+        end;
       TInstruction.i32_trunc_f32_u:
-        if not trunc<Single, Uint32>(stack) then
-          goto traps;
+        begin
+          var a := stack.top.f32;
+          if not (a > -1.0) and (a < 4294967296.0) then
+            goto traps;
+          stack.top.i32 := trunc(a);
+        end;
       TInstruction.i32_trunc_f64_s:
-        if not trunc<Double, Int32>(stack) then
-          goto traps;
+        begin
+          var a := stack.top.f64;
+          if not (a > -2147483649.0) and (a < 2147483648.0) then
+            goto traps;
+          stack.top.i32 := trunc(a);
+        end;
       TInstruction.i32_trunc_f64_u:
-        if not trunc<Double, Uint32>(stack) then
-          goto traps;
+        begin
+          var a := stack.top.f64;
+          if not (a > -1.0) and (a < 4294967296.0) then
+            goto traps;
+          stack.top.i32 := trunc(a);
+        end;
       TInstruction.i64_extend_i32_s:
-        stack.top := int64(stack.top.as<Int32>);
+        stack.top.i64 := int64(stack.top.AsInt32);
       TInstruction.i64_extend_i32_u:
-        stack.top := uint64(stack.top.i32); then
+        stack.top.i64 := uint64(stack.top.i32);
       TInstruction.i64_trunc_f32_s:
-        if not trunc<Single, int64_t>(stack) then
-          goto traps;
+        begin
+          var a := stack.top.f32;
+          if not (a > -9223373136366403584.0) and (a < 9223372036854775808.0) then
+            goto traps;
+          stack.top.i64 := trunc(a);
+        end;
       TInstruction.i64_trunc_f32_u:
-        if not trunc<Single, Int64>(stack) then
-          goto traps;
+        begin
+          var a := stack.top.f32;
+          if not (a > -1.0) and (a < 18446744073709551616.0) then
+            goto traps;
+          stack.top.i64 := trunc(a);
+        end;
       TInstruction.i64_trunc_f64_s:
-        if not trunc<Double, int64_t>(stack) then
-          goto traps;
+        begin
+          var a := stack.top.f64;
+          if not (a > -9223372036854777856.0) and (a < 9223372036854775808.0) then
+            goto traps;
+          stack.top.i64 := trunc(a);
+        end;
       TInstruction.i64_trunc_f64_u:
-        if (not trunc<Double, Int64>(stack))
-          goto traps;
+        begin
+          var a := stack.top.f64;
+          if not (a > -1.0) and (a < 18446744073709551616.0) then
+            goto traps;
+          stack.top.i64 := trunc(a);
+        end;
       TInstruction.f32_convert_i32_s:
-        convert<Int32, Single>(stack);
+        stack.top.f32 := stack.top.AsInt32;
       TInstruction.f32_convert_i32_u:
-        convert<Uint32, Single>(stack);
+        stack.top.f32 := stack.top.AsUint32;
       TInstruction.f32_convert_i64_s:
-        convert<int64_t, Single>(stack);
+        stack.top.f32 := stack.top.AsInt64;
       TInstruction.f32_convert_i64_u:
-        convert<Int64, Single>(stack);
+        stack.top.f32 := stack.top.AsInt64;
       TInstruction.f32_demote_f64:
-        stack.top = demote(stack.top.f64);
+        stack.top.f32 := stack.top.f64;
       TInstruction.f64_convert_i32_s:
-        convert<Int32, Double>(stack);
+        stack.top.f64 := stack.top.AsInt32;
       TInstruction.f64_convert_i32_u:
-        convert<Uint32, Double>(stack);
+        stack.top.f64 := stack.top.AsUint32;
       TInstruction.f64_convert_i64_s:
-        convert<int64_t, Double>(stack);
+        stack.top.f64 := stack.top.AsInt64;
       TInstruction.f64_convert_i64_u:
-        convert<Int64, Double>(stack);
+        stack.top.f64 := stack.top.AsUint64;
       TInstruction.f64_promote_f32:
-        stack.top = doublebeginstack.top.f32end;;
+        stack.top.f64 := Double(stack.top.f32);
       TInstruction.i32_reinterpret_f32:
         reinterpret<Single, Uint32>(stack);
       TInstruction.i64_reinterpret_f64:
