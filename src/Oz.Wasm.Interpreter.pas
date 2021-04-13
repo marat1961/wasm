@@ -1372,33 +1372,76 @@ begin
             stack.top.f32 := a;
         end;
       TInstruction.f32_max:
-        binary_op(stack, fmax<Single>);
+        begin
+          var a: Single := stack.pop.AsSingle;
+          var b: Single := stack.top.AsSingle;
+          if a.IsNan or b.IsNan then
+            stack.top.f32 := Single.NaN
+          else if (a = 0) and (b = 0) and
+            ((Tv32(a).i32 and F32SignMask <> 0) or
+             (Tv32(b).i32 and F32SignMask <> 0)) then
+            stack.top.f32 := -0.0
+          else if a < b then
+            stack.top.f32 := b
+          else
+            stack.top.f32 := a;
+        end;
       TInstruction.f32_copysign:
-        binary_op(stack, fcopysign<Single>);
-
+        begin
+          var a := stack.pop.i32;
+          var b := stack.top.i32 and F32SignMask;
+          stack.top.i32 := (a and F32AbsMask) or b;
+        end;
       TInstruction.f64_abs:
-        unary_op(stack, fabs<Double>);
+        stack.top.f64 := Abs(stack.top.f64);
       TInstruction.f64_neg:
         stack.top.i64 := stack.top.i64 xor F64SignMask;
       TInstruction.f64_ceil:
-        unary_op(stack, fceil<Double>);
+        if stack.top.AsDouble.IsNan then
+          stack.top.f64 := Double.NaN
+        else
+          stack.top.f64 := Ceil(stack.top.AsDouble);
       TInstruction.f64_floor:
-        unary_op(stack, ffloor<Double>);
+        if stack.top.AsDouble.IsNan then
+          stack.top.f64 := Double.NaN
+        else
+          stack.top.f64 := Floor(stack.top.AsDouble);
       TInstruction.f64_trunc:
-        unary_op(stack, ftrunc<Double>);
+        if stack.top.AsDouble.IsNan then
+          stack.top.f64 := Double.NaN
+        else
+          stack.top.f64 := Trunc(stack.top.AsDouble);
       TInstruction.f64_nearest:
-        unary_op(stack, fnearest<Double>);
+        if stack.top.AsDouble.IsNan then
+          stack.top.f64 := Double.NaN
+        else
+          stack.top.f64 := SimpleRoundTo(stack.top.AsDouble, 0);
       TInstruction.f64_sqrt:
-        unary_op(stack, static_cast<Double ( *)(Double)>(std::sqrt));
-
+        stack.top.f64 := Sqrt(stack.top.AsDouble);
       TInstruction.f64_add:
-          binary_op(stack, add<Double>);
+        begin
+          var a := stack.pop.AsDouble;
+          var b := stack.top.AsDouble;
+          stack.top.f64 := a + b;
+        end;
       TInstruction.f64_sub:
-        binary_op(stack, sub<Double>);
+        begin
+          var a := stack.pop.AsDouble;
+          var b := stack.top.AsDouble;
+          stack.top.f64 := a - b;
+        end;
       TInstruction.f64_mul:
-        binary_op(stack, mul<Double>);
+        begin
+          var a := stack.pop.AsDouble;
+          var b := stack.top.AsDouble;
+          stack.top.f64 := a * b;
+        end;
       TInstruction.f64_div:
-        binary_op(stack, fdiv<Double>);
+        begin
+          var a := stack.pop.AsDouble;
+          var b := stack.top.AsDouble;
+          stack.top.f64 := a / b;
+        end;
       TInstruction.f64_min:
         binary_op(stack, fmin<Double>);
       TInstruction.f64_max:
