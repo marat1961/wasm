@@ -155,9 +155,6 @@ type
     // Module of this instance.
     module: TModule;
     // Instance memory.
-    // Memory is either allocated and owned by the instance or imported as already
-    // allocated bytesand owned externally. For these cases unique_ptr would
-    // either have a normal deleter or no-op deleter respectively
     memory: TBytes;
     // Memory limits.
     memoryLimits: TLimits;
@@ -165,9 +162,6 @@ type
     // as unbounded in module.
     memoryPagesLimit: Cardinal;
     // Instance table.
-    // Table is either allocated and owned by the instance or imported and owned
-    // externally. For these cases unique_ptr would either have a normal deleter
-    // or no-op deleter respectively.
     table: PTable;
     // Table limits.
     tableLimits: TLimits;
@@ -222,7 +216,7 @@ type
     function CheckStore<DstT>: Boolean; inline;
     procedure StoreToMemory<T>(const value: T);
     procedure Branch(arity: Uint32); inline;
-    // Increases the size of memory by delta_pages.
+    // Increases the size of memory by deltaPages.
     function GrowMemory(deltaPages, memoryPagesLimit: Uint32): Uint32; inline;
   public
     procedure Init(instance: PInstance; funcIdx: TFuncIdx; const args: PValue);
@@ -267,20 +261,20 @@ implementation
 
 function rotl(lhs, rhs: Uint32): Uint32;
 const
-  num_bits = sizeof(Uint32);
+  Bits = sizeof(Uint32);
 begin
-  var k := rhs and (num_bits - 1);
+  var k := rhs and (Bits - 1);
   if k = 0 then exit(lhs);
-  Result := (lhs shl k) or (lhs shr (num_bits - k));
+  Result := (lhs shl k) or (lhs shr (Bits - k));
 end;
 
 function rotr(lhs, rhs: Uint32): Uint32;
 const
-  num_bits = sizeof(Uint32);
+  Bits = sizeof(Uint32);
 begin
-  var k := rhs and (num_bits - 1);
+  var k := rhs and (Bits - 1);
   if k = 0 then exit(lhs);
-  Result := (lhs shr k) or (lhs shl (num_bits - k));
+  Result := (lhs shr k) or (lhs shl (Bits - k));
 end;
 
 function __builtin_clz(x: Uint32): Uint32;
@@ -574,10 +568,10 @@ end;
 
 function TVm.GrowMemory(deltaPages, memoryPagesLimit: Uint32): Uint32;
 begin
-  var curPages := Length(memory) div PageSize;
+  var curPages := Uint32(Length(memory)) div PageSize;
   // These Assertions are guaranteed by allocation in instantiate
   // and this function for subsequent increases.
-  Assert(Length(memory) mod PageSize = 0);
+  Assert(Uint32(Length(memory)) mod PageSize = 0);
   Assert(memoryPagesLimit <= MaxMemoryPagesLimit);
   Assert(curPages <= memoryPagesLimit);
   var newPages := Uint64(curPages) + deltaPages;
@@ -597,11 +591,11 @@ end;
 function invoke_function(const funcType: TFuncType; funcIdx: Uint32;
   instance: PInstance; var stack: TOperandStack; var ctx: TExecutionContext): Boolean; inline;
 begin
-  var num_args := Length(funcType.inputs);
+  var num_args := Uint32(Length(funcType.inputs));
   Assert(stack.Size >= num_args);
   var call_args := PValue(PByte(stack.rend) - num_args);
 
-  var ctx_guard := ctx.IncrementCallDepth;
+  ctx.IncrementCallDepth;
   var ret := Execute(instance, TFuncIdx(funcIdx), call_args, ctx);
 
   // Bubble up traps
@@ -689,9 +683,9 @@ begin
         begin
           assert(instance.table <> nil);
           var expected_type_idx := pc.read<Uint32>;
-          assert(expected_type_idx < Length(instance.module.typesec));
+          assert(expected_type_idx < Uint32(Length(instance.module.typesec)));
           var elem_idx := stack.pop.AsUint32;
-          if elem_idx >= Length(instance.table^) then
+          if elem_idx >= Uint32(Length(instance.table^)) then
             goto traps;
 
           var called_func := instance.table^[elem_idx];
@@ -738,28 +732,28 @@ begin
       TInstruction.global_get:
         begin
           var idx := pc.read<Uint32>;
-          assert(idx < Length(instance.importedGlobals) + Length(instance.globals));
-          if (idx < Length(instance.importedGlobals)) then
+          assert(idx < Uint32(Length(instance.importedGlobals) + Length(instance.globals)));
+          if idx < Uint32(Length(instance.importedGlobals)) then
             stack.push(instance.importedGlobals[idx].value)
           else
           begin
-            var module_global_idx := idx - Length(instance.importedGlobals);
-            assert(module_global_idx < Length(instance.module.globalsec));
+            var module_global_idx := idx - Uint32(Length(instance.importedGlobals));
+            assert(module_global_idx < Uint32(Length(instance.module.globalsec)));
             stack.push(instance.globals[module_global_idx]);
           end;
         end;
       TInstruction.global_set:
         begin
           var idx := pc.read<Uint32>;
-          if idx < Length(instance.importedGlobals) then
+          if idx < Uint32(Length(instance.importedGlobals)) then
           begin
             assert(instance.importedGlobals[idx].typ.is_mutable);
             instance.importedGlobals[idx].value := stack.pop;
           end
           else
           begin
-            var module_global_idx := idx - Length(instance.importedGlobals);
-            assert(module_global_idx < Length(instance.module.globalsec));
+            var module_global_idx := idx - Uint32(Length(instance.importedGlobals));
+            assert(module_global_idx < Uint32(Length(instance.module.globalsec)));
             assert(instance.module.globalsec[module_global_idx].typ.is_mutable);
             instance.globals[module_global_idx] := stack.pop;
           end;
@@ -878,8 +872,8 @@ begin
         end;
       TInstruction.memory_size:
         begin
-          assert(Length(memory) mod PageSize = 0);
-          stack.push(TValue.From(Uint32(Length(memory) div PageSize)));
+          assert(Uint32(Length(memory)) mod PageSize = 0);
+          stack.push(Uint32(Length(memory)) div PageSize);
         end;
       TInstruction.memory_grow:
         stack.top.i64 := GrowMemory(stack.top.AsUint32, instance.memoryPagesLimit);
@@ -1572,7 +1566,7 @@ begin
 ends:
   assert(pc = @code.instructions[Length(code.instructions)]);
   // End of code must be reached.
-  assert(stack.size = Length(funcType.outputs));
+  assert(stack.size = Uint32(Length(funcType.outputs)));
 
   if stack.size <> 0 then
     exit(TExecutionResult.From(stack.top^))

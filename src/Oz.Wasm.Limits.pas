@@ -8,7 +8,7 @@ interface
 
 const
   // The page size as defined by the WebAssembly 1.0 specification.
-  PageSize: Cardinal = 65536;
+  PageSize: Uint32 = 65536;
 
   // The maximum memory page limit as defined by the specification.
   // It is only possible to address 4 GB (32-bit) of memory.

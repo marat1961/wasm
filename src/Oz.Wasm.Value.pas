@@ -14,7 +14,8 @@ type
   PValue = ^TValue;
   TValue = record
   public
-    constructor From(v: Uint64);
+    constructor From(v: Uint64); overload;
+    constructor From(v: Uint32); overload;
     function AsInt32: Int32;
     function AsUint32: Uint32;
     function AsUint64: Uint64;
@@ -34,6 +35,11 @@ implementation
 constructor TValue.From(v: Uint64);
 begin
   Self.i64 := v;
+end;
+
+constructor TValue.From(v: Uint32);
+begin
+  Self.i32 := v;
 end;
 
 function TValue.AsInt32: Int32;

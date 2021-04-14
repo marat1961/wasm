@@ -80,7 +80,7 @@ type
     constructor From(const args: PValue;
       num_args, num_local_variables, max_stack_height: Cardinal);
     // The current number of items on the stack (aka stack height).
-    function Size: Integer;
+    function Size: Uint32;
     // Pushes an item on the stack.
     // The stack max height limit is not checked.
     procedure Push(Item: TValue); overload;
@@ -256,7 +256,7 @@ begin
   Assert(NativeUInt(Result) < NativeUInt(FBottom));
 end;
 
-function TOperandStack.Size: Integer;
+function TOperandStack.Size: Uint32;
 begin
   Result := PByte(FTop) + 1 - PByte(FBottom);
 end;
