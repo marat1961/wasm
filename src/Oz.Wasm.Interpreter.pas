@@ -213,6 +213,7 @@ type
     instance: PInstance;
     code: TCode;
     memory: TBytes;
+    func_type: TFuncType;
     stack: TOperandStack;
     pc: PByte;
     vi: Uint64;
@@ -225,7 +226,7 @@ type
     function GrowMemory(deltaPages, memoryPagesLimit: Uint32): Uint32; inline;
   public
     procedure Init(instance: PInstance; func_idx: TFuncIdx; const args: PValue);
-    procedure Execute(var ctx: TExecutionContext);
+    function Execute(var ctx: TExecutionContext): TExecutionResult;
   end;
 
 {$EndRegion}
@@ -500,13 +501,11 @@ end;
 {$Region 'TVm'}
 
 procedure TVm.Init(instance: PInstance; func_idx: TFuncIdx; const args: PValue);
-var
-  func_type: TFuncType;
 begin
   Self.instance := instance;
   Self.code := instance.module.get_code(func_idx);
   Self.memory := instance.memory;
-  func_type := instance.module.get_function_type(func_idx);
+  Self.func_type := instance.module.get_function_type(func_idx);
   Self.stack := TOperandStack.From(args, Length(func_type.inputs), code.local_count, code.max_stack_height);
   Self.pc := @code.instructions[0];
 end;
@@ -621,7 +620,7 @@ begin
   Result := True;
 end;
 
-procedure TVm.Execute(var ctx: TExecutionContext);
+function TVm.Execute(var ctx: TExecutionContext): TExecutionResult;
 label
   traps, ends;
 var
@@ -1561,25 +1560,22 @@ begin
         stack.top.f64 := stack.top.AsUint64;
       TInstruction.f64_promote_f32:
         stack.top.f64 := Double(stack.top.f32);
-      TInstruction.i32_reinterpret_f32:
-        reinterpret<Single, Uint32>(stack);
-      TInstruction.i64_reinterpret_f64:
-        reinterpret<Double, Int64>(stack);
-      TInstruction.f32_reinterpret_i32:
-        reinterpret<Uint32, Single>(stack);
+      TInstruction.i32_reinterpret_f32,
+      TInstruction.i64_reinterpret_f64,
+      TInstruction.f32_reinterpret_i32,
       TInstruction.f64_reinterpret_i64:
-        reinterpret<Int64, Double>(stack);
+        {reinterpret};
       else
         assert(False, 'unreachable')
     end;
   until False;
 ends:
-  assert(pc = &code.instructions[code.instructions.size]);
+  assert(pc = @code.instructions[Length(code.instructions)]);
   // End of code must be reached.
-  assert(stack.size = instance.module.get_function_type(func_idx).outputs.size);
+  assert(stack.size = Length(func_type.outputs));
 
   if stack.size <> 0 then
-    exit(ExecutionResultbeginstack.top)
+    exit(TExecutionResult.From(stack.top^))
   else
     exit(Void);
 traps:
@@ -1612,7 +1608,7 @@ begin
     exit(instance.imported_functions[func_idx].func.Call(instance, args, ctx));
 
   vm.Init(instance, func_idx, args);
-  vm.Execute;
+  Result := vm.Execute(ctx);
 end;
 
 {$EndRegion}
