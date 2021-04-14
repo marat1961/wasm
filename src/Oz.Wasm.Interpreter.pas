@@ -129,11 +129,11 @@ type
   TExternalFunction = record
   var
     func: TExecuteFunction;
-    input_types: TSpan<TValType>;
-    output_types: TSpan<TValType>;
+    inputTypes: TSpan<TValType>;
+    outputTypes: TSpan<TValType>;
   public
-    constructor From(const func: TExecuteFunction; const input_types: TSpan<TValType>;
-      const output_types: TSpan<TValType>); overload;
+    constructor From(const func: TExecuteFunction; const inputTypes: TSpan<TValType>;
+      const outputTypes: TSpan<TValType>); overload;
     constructor From(const func: TExecuteFunction; const typ: TFuncType); overload;
   end;
 
@@ -160,32 +160,32 @@ type
     // either have a normal deleter or no-op deleter respectively
     memory: TBytes;
     // Memory limits.
-    memory_limits: TLimits;
+    memoryLimits: TLimits;
     // Hard limit for memory growth in pages, checked when memory is defined
     // as unbounded in module.
-    memory_pages_limit: Cardinal;
+    memoryPagesLimit: Cardinal;
     // Instance table.
     // Table is either allocated and owned by the instance or imported and owned
     // externally. For these cases unique_ptr would either have a normal deleter
     // or no-op deleter respectively.
     table: PTable;
     // Table limits.
-    table_limits: TLimits;
+    tableLimits: TLimits;
     // Instance globals (excluding imported globals).
     globals: TArray<TValue>;
     // Imported functions.
-    imported_functions: TArray<TExternalFunction>;
+    importedFunctions: TArray<TExternalFunction>;
     // Imported globals.
-    imported_globals: TArray<TExternalGlobal>;
+    importedGlobals: TArray<TExternalGlobal>;
   public
     constructor From(const module: TModule;
       const memory: TBytes;
-      const memory_limits: TLimits;
-      const memory_pages_limit: Cardinal;
-      table: PTable; table_limits: TLimits;
+      const memoryLimits: TLimits;
+      const memoryPagesLimit: Cardinal;
+      table: PTable; tableLimits: TLimits;
       const globals: TArray<TValue>;
-      const imported_functions: TArray<TExternalFunction>;
-      const imported_globals: TArray<TExternalGlobal>);
+      const importedFunctions: TArray<TExternalFunction>;
+      const importedGlobals: TArray<TExternalGlobal>);
   end;
 
 {$EndRegion}
@@ -213,7 +213,7 @@ type
     instance: PInstance;
     code: TCode;
     memory: TBytes;
-    func_type: TFuncType;
+    funcType: TFuncType;
     stack: TOperandStack;
     pc: PByte;
     vi: Uint64;
@@ -439,16 +439,16 @@ end;
 constructor TExternalFunction.From(const func: TExecuteFunction; const typ: TFuncType);
 begin
   Self.func := func;
-  input_types := TSpan<TValType>.From(@typ.inputs[0], Length(typ.inputs));
-  output_types := TSpan<TValType>.From(@typ.outputs[0], Length(typ.outputs));
+  inputTypes := TSpan<TValType>.From(@typ.inputs[0], Length(typ.inputs));
+  outputTypes := TSpan<TValType>.From(@typ.outputs[0], Length(typ.outputs));
 end;
 
-constructor TExternalFunction.From(const func: TExecuteFunction; const input_types,
-  output_types: TSpan<TValType>);
+constructor TExternalFunction.From(const func: TExecuteFunction; const inputTypes,
+  outputTypes: TSpan<TValType>);
 begin
   Self.func := func;
-  Self.input_types := input_types;
-  Self.output_types := output_types;
+  Self.inputTypes := inputTypes;
+  Self.outputTypes := outputTypes;
 end;
 
 {$EndRegion}
@@ -456,21 +456,21 @@ end;
 {$Region 'TInstance'}
 
 constructor TInstance.From(const module: TModule; const memory: TBytes;
-  const memory_limits: TLimits; const memory_pages_limit: Cardinal;
-  table: PTable; table_limits: TLimits;
+  const memoryLimits: TLimits; const memoryPagesLimit: Cardinal;
+  table: PTable; tableLimits: TLimits;
   const globals: TArray<TValue>;
-  const imported_functions: TArray<TExternalFunction>;
-  const imported_globals: TArray<TExternalGlobal>);
+  const importedFunctions: TArray<TExternalFunction>;
+  const importedGlobals: TArray<TExternalGlobal>);
 begin
   Self.module := module;
   Self.memory := memory;
-  Self.memory_limits := memory_limits;
-  Self.memory_pages_limit := memory_pages_limit;
+  Self.memoryLimits := memoryLimits;
+  Self.memoryPagesLimit := memoryPagesLimit;
   Self.table := table;
-  Self.table_limits := table_limits;
+  Self.tableLimits := tableLimits;
   Self.globals := globals;
-  Self.imported_functions := imported_functions;
-  Self.imported_globals := imported_globals;
+  Self.importedFunctions := importedFunctions;
+  Self.importedGlobals := importedGlobals;
 end;
 
 {$EndRegion}
@@ -505,8 +505,8 @@ begin
   Self.instance := instance;
   Self.code := instance.module.get_code(funcIdx);
   Self.memory := instance.memory;
-  Self.func_type := instance.module.get_function_type(funcIdx);
-  Self.stack := TOperandStack.From(args, Length(func_type.inputs), code.local_count, code.max_stack_height);
+  Self.funcType := instance.module.get_function_type(funcIdx);
+  Self.stack := TOperandStack.From(args, Length(funcType.inputs), code.local_count, code.max_stack_height);
   Self.pc := @code.instructions[0];
 end;
 
@@ -584,7 +584,7 @@ begin
   if newPages > memoryPagesLimit then
     exit(Uint32(-1));
   try
-    // newPages <= memory_pages_limit <= MaxMemoryPagesLimit guarantees multiplication
+    // newPages <= memoryPagesLimit <= MaxMemoryPagesLimit guarantees multiplication
     // will not overflow Uint32.
     Assert(newPages * PageSize <= Uint32.MaxValue);
     SetLength(memory, newPages * PageSize);
@@ -594,10 +594,10 @@ begin
   end;
 end;
 
-function invoke_function(const func_type: TFuncType; funcIdx: Uint32;
+function invoke_function(const funcType: TFuncType; funcIdx: Uint32;
   instance: PInstance; var stack: TOperandStack; var ctx: TExecutionContext): Boolean; inline;
 begin
-  var num_args := Length(func_type.inputs);
+  var num_args := Length(funcType.inputs);
   Assert(stack.Size >= num_args);
   var call_args := PValue(PByte(stack.rend) - num_args);
 
@@ -610,7 +610,7 @@ begin
 
   stack.drop(num_args);
 
-  var num_outputs := Length(func_type.outputs);
+  var num_outputs := Length(funcType.outputs);
   // NOTE: we can assume these two from validation
   Assert(num_outputs <= 1);
   Assert(ret.hasValue = (num_outputs = 1));
@@ -681,8 +681,8 @@ begin
       TInstruction.call:
         begin
           var called_funcIdx := pc.read<Uint32>;
-          var called_func_type := instance.module.get_function_type(called_funcIdx);
-          if not invoke_function(called_func_type, called_funcIdx, instance, stack, ctx) then
+          var called_funcType := instance.module.get_function_type(called_funcIdx);
+          if not invoke_function(called_funcType, called_funcIdx, instance, stack, ctx) then
             goto traps;
         end;
       TInstruction.call_indirect:
@@ -738,12 +738,12 @@ begin
       TInstruction.global_get:
         begin
           var idx := pc.read<Uint32>;
-          assert(idx < Length(instance.imported_globals) + Length(instance.globals));
-          if (idx < Length(instance.imported_globals)) then
-            stack.push(instance.imported_globals[idx].value)
+          assert(idx < Length(instance.importedGlobals) + Length(instance.globals));
+          if (idx < Length(instance.importedGlobals)) then
+            stack.push(instance.importedGlobals[idx].value)
           else
           begin
-            var module_global_idx := idx - Length(instance.imported_globals);
+            var module_global_idx := idx - Length(instance.importedGlobals);
             assert(module_global_idx < Length(instance.module.globalsec));
             stack.push(instance.globals[module_global_idx]);
           end;
@@ -751,14 +751,14 @@ begin
       TInstruction.global_set:
         begin
           var idx := pc.read<Uint32>;
-          if idx < Length(instance.imported_globals) then
+          if idx < Length(instance.importedGlobals) then
           begin
-            assert(instance.imported_globals[idx].typ.is_mutable);
-            instance.imported_globals[idx].value := stack.pop;
+            assert(instance.importedGlobals[idx].typ.is_mutable);
+            instance.importedGlobals[idx].value := stack.pop;
           end
           else
           begin
-            var module_global_idx := idx - Length(instance.imported_globals);
+            var module_global_idx := idx - Length(instance.importedGlobals);
             assert(module_global_idx < Length(instance.module.globalsec));
             assert(instance.module.globalsec[module_global_idx].typ.is_mutable);
             instance.globals[module_global_idx] := stack.pop;
@@ -882,7 +882,7 @@ begin
           stack.push(TValue.From(Uint32(Length(memory) div PageSize)));
         end;
       TInstruction.memory_grow:
-        stack.top.i64 := GrowMemory(stack.top.AsUint32, instance.memory_pages_limit);
+        stack.top.i64 := GrowMemory(stack.top.AsUint32, instance.memoryPagesLimit);
       TInstruction.i32_const, TInstruction.f32_const:
         begin
           var value := pc.read<Uint32>;
@@ -1572,7 +1572,7 @@ begin
 ends:
   assert(pc = @code.instructions[Length(code.instructions)]);
   // End of code must be reached.
-  assert(stack.size = Length(func_type.outputs));
+  assert(stack.size = Length(funcType.outputs));
 
   if stack.size <> 0 then
     exit(TExecutionResult.From(stack.top^))
@@ -1603,9 +1603,9 @@ begin
   if ctx.depth >= CallStackLimit then
     exit(Trap);
 
-  Assert(Length(instance.module.imported_function_types) = Length(instance.imported_functions));
-  if funcIdx < Cardinal(Length(instance.imported_functions)) then
-    exit(instance.imported_functions[funcIdx].func.Call(instance, args, ctx));
+  Assert(Length(instance.module.imported_function_types) = Length(instance.importedFunctions));
+  if funcIdx < Cardinal(Length(instance.importedFunctions)) then
+    exit(instance.importedFunctions[funcIdx].func.Call(instance, args, ctx));
 
   vm.Init(instance, funcIdx, args);
   Result := vm.Execute(ctx);
