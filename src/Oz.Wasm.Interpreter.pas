@@ -21,8 +21,8 @@ type
     // This is true if the execution has trapped.
     trapped: Boolean;
     // This is true if value contains valid data.
-    has_value: Boolean;
-    // The result value. Valid if `has_value = true`.
+    hasValue: Boolean;
+    // The result value. Valid if `hasValue = true`.
     value: TValue;
     // Constructs result with a value.
     constructor From(const value: TValue); overload;
@@ -31,10 +31,10 @@ type
     constructor From(success: Boolean); overload;
   end;
 const
-  BranchImmediateSize = 2 * sizeof(uint32);
+  BranchImmediateSize = 2 * sizeof(Uint32);
   // Shortcut for execution that resulted in successful execution,
   // but without a result.
-  Void: TExecutionResult = (has_value: False);
+  Void: TExecutionResult = (hasValue: False);
   // Shortcut for execution that resulted in a trap.
   Trap: TExecutionResult = (trapped: True);
 
@@ -53,7 +53,7 @@ type
     // when going out of scope.
     TGuard = class
       // Reference to the guarded execution context.
-      m_execution_context: TExecutionContext;
+      FExecutionContext: TExecutionContext;
       constructor Create(ctx: TExecutionContext);
       destructor Destroy; override;
     end;
@@ -62,7 +62,7 @@ type
   public
     // Increments the call depth and returns the guard object which decrements
     // the call depth back to the original value when going out of scope.
-    function increment_call_depth: TGuard;
+    function IncrementCallDepth: TGuard;
   end;
 
 {$EndRegion}
@@ -74,47 +74,47 @@ type
     // Pointer to function's instance or nullptr when table element is not initialized.
     instance: PInstance;
     // Index of the function in instance.
-    func_idx: TFuncIdx;
+    funcIdx: TFuncIdx;
     // This pointer is empty most of the time and is used only to keep instance alive
     // in one edge case, when start function traps, but instantiate has already
     // modified some elements of a shared (imported) table.
-    shared_instance: PInstance;
+    sharedInstance: PInstance;
   end;
 
-  table_elements = TArray<TTableElement>;
-  table_ptr = ^table_elements;
+  TTableElements = TArray<TTableElement>;
+  PTable = ^TTableElements;
 
 {$EndRegion}
 
 {$Region 'ExecuteFunction: WebAssembly or host function execution'}
 
-  THostFunctionPtr = function(host_context: TObject; Instance: Pointer;
+  THostFunctionPtr = function(hostContext: TObject; Instance: Pointer;
     const args: PValue; var ctx: TExecutionContext): TExecutionResult;
 
   TExecuteFunction = class
   private
     // Pointer to WebAssembly function instance.
     // Equals nullptr in case this ExecuteFunction represents host function.
-    m_instance: PInstance;
+    FInstance: PInstance;
     // Index of WebAssembly function.
     // Equals 0 in case this ExecuteFunction represents host function.
-    m_func_idx: TFuncIdx;
+    FFuncIdx: TFuncIdx;
     // Pointer to a host function.
     // Equals nullptr in case this ExecuteFunction represents WebAssembly function.
-    m_host_function: THostFunctionPtr;
+    FHostFunction: THostFunctionPtr;
     // Opaque context of host function execution,
-    // which is passed to it as host_context parameter.
+    // which is passed to it as hostContext parameter.
     // Doesn't have value in case this ExecuteFunction represents WebAssembly function.
-    m_host_context: TObject;
+    FHostContext: TObject;
   public
-    constructor Create(instance: PInstance; func_idx: TFuncIdx); overload;
+    constructor Create(instance: PInstance; funcIdx: TFuncIdx); overload;
     // Host function constructor without context.
-    // The function will always be called with empty host_context argument.
+    // The function will always be called with empty hostContext argument.
     constructor Create(f: THostFunctionPtr); overload;
     // Host function constructor with context.
-    // The function will be called with a reference to @a host_context.
-    // Copies of the function will have their own copy of @a host_context.
-    constructor Create(f: THostFunctionPtr; host_context: TObject); overload;
+    // The function will be called with a reference to @a hostContext.
+    // Copies of the function will have their own copy of @a hostContext.
+    constructor Create(f: THostFunctionPtr; hostContext: TObject); overload;
     // Function call operator.
     function Call(instance: PInstance; const args: PValue;
       var ctx: TExecutionContext): TExecutionResult;
@@ -168,7 +168,7 @@ type
     // Table is either allocated and owned by the instance or imported and owned
     // externally. For these cases unique_ptr would either have a normal deleter
     // or no-op deleter respectively.
-    table: table_ptr;
+    table: PTable;
     // Table limits.
     table_limits: TLimits;
     // Instance globals (excluding imported globals).
@@ -182,7 +182,7 @@ type
       const memory: TBytes;
       const memory_limits: TLimits;
       const memory_pages_limit: Cardinal;
-      table: table_ptr; table_limits: TLimits;
+      table: PTable; table_limits: TLimits;
       const globals: TArray<TValue>;
       const imported_functions: TArray<TExternalFunction>;
       const imported_globals: TArray<TExternalGlobal>);
@@ -225,7 +225,7 @@ type
     // Increases the size of memory by delta_pages.
     function GrowMemory(deltaPages, memoryPagesLimit: Uint32): Uint32; inline;
   public
-    procedure Init(instance: PInstance; func_idx: TFuncIdx; const args: PValue);
+    procedure Init(instance: PInstance; funcIdx: TFuncIdx; const args: PValue);
     function Execute(var ctx: TExecutionContext): TExecutionResult;
   end;
 
@@ -246,19 +246,19 @@ type
 // Execute a function from an instance with execution context
 // starting with default depth of 0.
 // Arguments and behavior is the same as in the other execute.
-function Execute(instance: PInstance; func_idx: TFuncIdx;
+function Execute(instance: PInstance; funcIdx: TFuncIdx;
   const args: PValue): TExecutionResult; inline; overload;
 
 // Execute a function from an instance.
 // Parameters
 //   instance  The instance.
-//   func_idx  The function index. MUST be a valid index, otherwise undefined behaviour
+//   funcIdx  The function index. MUST be a valid index, otherwise undefined behaviour
 //             (including crash) happens.
 //   args      The pointer to the arguments. The number of items and their types must
 //             match the expected number of input parameters of the function, otherwise
 //             undefined behaviour (including crash) happens.
 //   ctx       Execution context.
-function Execute(instance: PInstance; func_idx: TFuncIdx;
+function Execute(instance: PInstance; funcIdx: TFuncIdx;
   const args: PValue; var ctx: TExecutionContext): TExecutionResult; overload;
 
 {$EndRegion}
@@ -360,7 +360,7 @@ end;
 
 constructor TExecutionResult.From(const value: TValue);
 begin
-  Self.has_value := True;
+  Self.hasValue := True;
   Self.value := value;
 end;
 
@@ -375,12 +375,12 @@ end;
 
 constructor TExecutionContext.TGuard.Create(ctx: TExecutionContext);
 begin
-  Self.m_execution_context := ctx;
+  Self.FExecutionContext := ctx;
 end;
 
 destructor TExecutionContext.TGuard.Destroy;
 begin
-  Dec(m_execution_context.depth);
+  Dec(FExecutionContext.depth);
   inherited;
 end;
 
@@ -388,7 +388,7 @@ end;
 
 {$Region 'TExecutionContext'}
 
-function TExecutionContext.increment_call_depth: TGuard;
+function TExecutionContext.IncrementCallDepth: TGuard;
 begin
   Inc(depth);
   Result := TGuard.Create(Self);
@@ -398,38 +398,38 @@ end;
 
 {$Region 'ExecuteFunction'}
 
-constructor TExecuteFunction.Create(instance: PInstance; func_idx: TFuncIdx);
+constructor TExecuteFunction.Create(instance: PInstance; funcIdx: TFuncIdx);
 begin
   inherited Create;
-  m_instance := instance;
-  m_func_idx := func_idx;
+  FInstance := instance;
+  FFuncIdx := funcIdx;
 end;
 
 constructor TExecuteFunction.Create(f: THostFunctionPtr);
 begin
   inherited Create;
-  m_host_function := f;
+  FHostFunction := f;
 end;
 
-constructor TExecuteFunction.Create(f: THostFunctionPtr; host_context: TObject);
+constructor TExecuteFunction.Create(f: THostFunctionPtr; hostContext: TObject);
 begin
   inherited Create;
-  m_host_function := f;
-  m_host_context := host_context;
+  FHostFunction := f;
+  FHostContext := hostContext;
 end;
 
 function TExecuteFunction.Call(instance: PInstance; const args: PValue;
   var ctx: TExecutionContext): TExecutionResult;
 begin
-  if m_instance <> nil then
-    Result := execute(m_instance, m_func_idx, args, ctx)
+  if FInstance <> nil then
+    Result := execute(FInstance, FFuncIdx, args, ctx)
   else
-    Result := m_host_function(m_host_context, instance, args, ctx);
+    Result := FHostFunction(FHostContext, instance, args, ctx);
 end;
 
 function TExecuteFunction.GetHostFunction: THostFunctionPtr;
 begin
-  Result := m_host_function;
+  Result := FHostFunction;
 end;
 
 {$EndRegion}
@@ -457,7 +457,7 @@ end;
 
 constructor TInstance.From(const module: TModule; const memory: TBytes;
   const memory_limits: TLimits; const memory_pages_limit: Cardinal;
-  table: table_ptr; table_limits: TLimits;
+  table: PTable; table_limits: TLimits;
   const globals: TArray<TValue>;
   const imported_functions: TArray<TExternalFunction>;
   const imported_globals: TArray<TExternalGlobal>);
@@ -500,12 +500,12 @@ end;
 
 {$Region 'TVm'}
 
-procedure TVm.Init(instance: PInstance; func_idx: TFuncIdx; const args: PValue);
+procedure TVm.Init(instance: PInstance; funcIdx: TFuncIdx; const args: PValue);
 begin
   Self.instance := instance;
-  Self.code := instance.module.get_code(func_idx);
+  Self.code := instance.module.get_code(funcIdx);
   Self.memory := instance.memory;
-  Self.func_type := instance.module.get_function_type(func_idx);
+  Self.func_type := instance.module.get_function_type(funcIdx);
   Self.stack := TOperandStack.From(args, Length(func_type.inputs), code.local_count, code.max_stack_height);
   Self.pc := @code.instructions[0];
 end;
@@ -594,15 +594,15 @@ begin
   end;
 end;
 
-function invoke_function(const func_type: TFuncType; func_idx: Uint32;
+function invoke_function(const func_type: TFuncType; funcIdx: Uint32;
   instance: PInstance; var stack: TOperandStack; var ctx: TExecutionContext): Boolean; inline;
 begin
   var num_args := Length(func_type.inputs);
   Assert(stack.Size >= num_args);
   var call_args := PValue(PByte(stack.rend) - num_args);
 
-  var ctx_guard := ctx.increment_call_depth;
-  var ret := Execute(instance, TFuncIdx(func_idx), call_args, ctx);
+  var ctx_guard := ctx.IncrementCallDepth;
+  var ret := Execute(instance, TFuncIdx(funcIdx), call_args, ctx);
 
   // Bubble up traps
   if ret.trapped then
@@ -613,7 +613,7 @@ begin
   var num_outputs := Length(func_type.outputs);
   // NOTE: we can assume these two from validation
   Assert(num_outputs <= 1);
-  Assert(ret.has_value = (num_outputs = 1));
+  Assert(ret.hasValue = (num_outputs = 1));
   // Push back the result
   if num_outputs <> 0 then
     stack.push(ret.value);
@@ -680,9 +680,9 @@ begin
         end;
       TInstruction.call:
         begin
-          var called_func_idx := pc.read<Uint32>;
-          var called_func_type := instance.module.get_function_type(called_func_idx);
-          if not invoke_function(called_func_type, called_func_idx, instance, stack, ctx) then
+          var called_funcIdx := pc.read<Uint32>;
+          var called_func_type := instance.module.get_function_type(called_funcIdx);
+          if not invoke_function(called_func_type, called_funcIdx, instance, stack, ctx) then
             goto traps;
         end;
       TInstruction.call_indirect:
@@ -700,11 +700,11 @@ begin
             goto traps;
 
           // check actual type against expected type
-          var actual_type := called_func.instance.module.get_function_type(called_func.func_idx);
+          var actual_type := called_func.instance.module.get_function_type(called_func.funcIdx);
           var expected_type := instance.module.typesec[expected_type_idx];
           if not expected_type.Equals(actual_type) then
             goto traps;
-          if not invoke_function(actual_type, called_func.func_idx, called_func.instance, stack, ctx) then
+          if not invoke_function(actual_type, called_func.funcIdx, called_func.instance, stack, ctx) then
             goto traps;
         end;
       TInstruction.drop:
@@ -1586,15 +1586,15 @@ end;
 
 {$Region 'execute functions'}
 
-function Execute(instance: PInstance; func_idx: TFuncIdx;
+function Execute(instance: PInstance; funcIdx: TFuncIdx;
   const args: PValue): TExecutionResult; inline; overload;
 var
   ctx: TExecutionContext;
 begin
-  Result := execute(instance, func_idx, args, ctx);
+  Result := execute(instance, funcIdx, args, ctx);
 end;
 
-function Execute(instance: PInstance; func_idx: TFuncIdx;
+function Execute(instance: PInstance; funcIdx: TFuncIdx;
   const args: PValue; var ctx: TExecutionContext): TExecutionResult;
 var
   vm: TVm;
@@ -1604,10 +1604,10 @@ begin
     exit(Trap);
 
   Assert(Length(instance.module.imported_function_types) = Length(instance.imported_functions));
-  if func_idx < Cardinal(Length(instance.imported_functions)) then
-    exit(instance.imported_functions[func_idx].func.Call(instance, args, ctx));
+  if funcIdx < Cardinal(Length(instance.imported_functions)) then
+    exit(instance.imported_functions[funcIdx].func.Call(instance, args, ctx));
 
-  vm.Init(instance, func_idx, args);
+  vm.Init(instance, funcIdx, args);
   Result := vm.Execute(ctx);
 end;
 
