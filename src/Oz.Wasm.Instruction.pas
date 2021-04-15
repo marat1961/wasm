@@ -208,21 +208,6 @@ type
     i64_extend16_s = $C3,      // i64.extend16_s
     i64_extend32_s = $C4);     // i64.extend32_s
 
-  TOp = record
-    code: TInstruction;
-    name: string;
-    function From(code: TInstruction; const name: string): TInstruction;
-  end;
-
 implementation
-
-{ TOp }
-
-function TOp.From(code: TInstruction; const name: string): TInstruction;
-begin
-  Self.code := code;
-  Self.name := name;
-  Result := code;
-end;
 
 end.

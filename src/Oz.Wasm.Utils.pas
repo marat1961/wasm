@@ -100,7 +100,7 @@ type
     // Drop num items from the top of the stack.
     procedure Drop(num: Cardinal);
     // Returns the reference to the stack item on given position from the stack top.
-    // Requires index < size().
+    // Requires index < Size.
     property Items[Index: Integer]: PValue read GetItem;
   end;
 

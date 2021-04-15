@@ -497,9 +497,9 @@ end;
 procedure TVm.Init(instance: PInstance; funcIdx: TFuncIdx; const args: PValue);
 begin
   Self.instance := instance;
-  Self.code := instance.module.get_code(funcIdx);
+  Self.code := instance.module.getCode(funcIdx);
   Self.memory := instance.memory;
-  Self.funcType := instance.module.get_function_type(funcIdx);
+  Self.funcType := instance.module.getFunctionType(funcIdx);
   Self.stack := TOperandStack.From(args, Length(funcType.inputs), code.local_count, code.max_stack_height);
   Self.pc := @code.instructions[0];
 end;
@@ -675,7 +675,7 @@ begin
       TInstruction.call:
         begin
           var called_funcIdx := pc.read<Uint32>;
-          var called_funcType := instance.module.get_function_type(called_funcIdx);
+          var called_funcType := instance.module.getFunctionType(called_funcIdx);
           if not invoke_function(called_funcType, called_funcIdx, instance, stack, ctx) then
             goto traps;
         end;
@@ -694,7 +694,7 @@ begin
             goto traps;
 
           // check actual type against expected type
-          var actual_type := called_func.instance.module.get_function_type(called_func.funcIdx);
+          var actual_type := called_func.instance.module.getFunctionType(called_func.funcIdx);
           var expected_type := instance.module.typesec[expected_type_idx];
           if not expected_type.Equals(actual_type) then
             goto traps;
@@ -1597,7 +1597,7 @@ begin
   if ctx.depth >= CallStackLimit then
     exit(Trap);
 
-  Assert(Length(instance.module.imported_function_types) = Length(instance.importedFunctions));
+  Assert(Length(instance.module.importedFunctionTypes) = Length(instance.importedFunctions));
   if funcIdx < Cardinal(Length(instance.importedFunctions)) then
     exit(instance.importedFunctions[funcIdx].func.Call(instance, args, ctx));
 

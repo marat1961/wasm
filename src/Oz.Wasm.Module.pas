@@ -34,74 +34,74 @@ type
     codesec: TArray<TCode>;
     datasec: TArray<TData>;
     // Types of functions defined in import section
-    imported_function_types: TArray<TFuncType> ;
+    importedFunctionTypes: TArray<TFuncType> ;
     // Types of tables defined in import section
-    imported_table_types: TArray<TTable>;
+    importedTableTypes: TArray<TTable>;
     // Types of memories defined in import section
-    imported_memory_types: TArray<TMemory>;
+    importedMemoryTypes: TArray<TMemory>;
     // Types of globals defined in import section
-    imported_global_types: TArray<TGlobalType>;
+    importedGlobalTypes: TArray<TGlobalType>;
   public
-    function get_function_count: NativeInt;
-    function get_function_type(idx: TFuncIdx): TFuncType;
-    function get_global_count: NativeInt;
-    function get_global_type(idx: TGlobalIdx): TGlobalType;
-    function get_code(func_idx: TFuncIdx): TCode;
-    function has_table: Boolean;
-    function has_memory: Boolean;
+    function getFunctionCount: NativeInt;
+    function getFunctionType(idx: TFuncIdx): TFuncType;
+    function getGlobalCount: NativeInt;
+    function getGlobalType(idx: TGlobalIdx): TGlobalType;
+    function getCode(func_idx: TFuncIdx): TCode;
+    function hasTable: Boolean;
+    function hasMemory: Boolean;
   end;
 
 implementation
 
-function TModule.get_function_count: NativeInt;
+function TModule.getFunctionCount: NativeInt;
 begin
-  Result := Length(imported_function_types) + Length(funcsec);
+  Result := Length(importedFunctionTypes) + Length(funcsec);
 end;
 
-function TModule.get_function_type(idx: TFuncIdx): TFuncType;
+function TModule.getFunctionType(idx: TFuncIdx): TFuncType;
 var
   type_idx: Integer;
 begin
-  assert(idx < get_function_count);
-  if idx < Length(imported_function_types) then
-    exit(imported_function_types[idx]);
-  type_idx := funcsec[idx - Length(imported_function_types)];
+  assert(idx < getFunctionCount);
+  if idx < Length(importedFunctionTypes) then
+    exit(importedFunctionTypes[idx]);
+  type_idx := funcsec[idx - Length(importedFunctionTypes)];
   assert(type_idx < Length(typesec));
   Result := typesec[type_idx];
 end;
 
-function TModule.get_global_count: NativeInt;
+function TModule.getGlobalCount: NativeInt;
 begin
-  Result := Length(imported_global_types) + Length(globalsec);
+  Result := Length(importedGlobalTypes) + Length(globalsec);
 end;
 
-function TModule.get_global_type(idx: TGlobalIdx): TGlobalType;
+function TModule.getGlobalType(idx: TGlobalIdx): TGlobalType;
 begin
-  assert(idx < get_global_count());
-  if idx < Length(imported_global_types) then
-    Result := imported_global_types[idx]
+  assert(idx < getGlobalCount);
+  if idx < Length(importedGlobalTypes) then
+    Result := importedGlobalTypes[idx]
   else
-    Result := globalsec[idx - Length(imported_global_types)].typ;
+    Result := globalsec[idx - Length(importedGlobalTypes)].typ;
 end;
 
-function TModule.get_code(func_idx: TFuncIdx): TCode;
+function TModule.getCode(func_idx: TFuncIdx): TCode;
 var
   code_idx: Integer;
 begin
-  assert(func_idx >= Length(imported_function_types) {function can't be imported});
-  code_idx := func_idx - Length(imported_function_types);
+  assert(func_idx >= Length(importedFunctionTypes) {function can't be imported});
+  code_idx := func_idx - Length(importedFunctionTypes);
   assert(code_idx < Length(codesec));
   Result := codesec[code_idx];
 end;
 
-function TModule.has_table: Boolean;
+function TModule.hasTable: Boolean;
 begin
-  Result := (tablesec <> nil) or (imported_table_types <> nil);
+  Result := (tablesec <> nil) or (importedTableTypes <> nil);
 end;
 
-function TModule.has_memory: Boolean;
+function TModule.hasMemory: Boolean;
 begin
-  Result := (memorysec <> nil) or (imported_memory_types <> nil);
+  Result := (memorysec <> nil) or (importedMemoryTypes <> nil);
 end;
 
 end.
