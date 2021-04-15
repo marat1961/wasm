@@ -46,7 +46,7 @@ type
     function getFunctionType(idx: TFuncIdx): TFuncType;
     function getGlobalCount: NativeInt;
     function getGlobalType(idx: TGlobalIdx): TGlobalType;
-    function getCode(func_idx: TFuncIdx): TCode;
+    function getCode(funcIdx: TFuncIdx): TCode;
     function hasTable: Boolean;
     function hasMemory: Boolean;
   end;
@@ -60,14 +60,14 @@ end;
 
 function TModule.getFunctionType(idx: TFuncIdx): TFuncType;
 var
-  type_idx: Integer;
+  typeIdx: Integer;
 begin
   assert(idx < getFunctionCount);
   if idx < Length(importedFunctionTypes) then
     exit(importedFunctionTypes[idx]);
-  type_idx := funcsec[idx - Length(importedFunctionTypes)];
-  assert(type_idx < Length(typesec));
-  Result := typesec[type_idx];
+  typeIdx := funcsec[idx - Length(importedFunctionTypes)];
+  assert(typeIdx < Length(typesec));
+  Result := typesec[typeIdx];
 end;
 
 function TModule.getGlobalCount: NativeInt;
@@ -84,14 +84,14 @@ begin
     Result := globalsec[idx - Length(importedGlobalTypes)].typ;
 end;
 
-function TModule.getCode(func_idx: TFuncIdx): TCode;
+function TModule.getCode(funcIdx: TFuncIdx): TCode;
 var
-  code_idx: Integer;
+  codeIdx: Integer;
 begin
-  assert(func_idx >= Length(importedFunctionTypes) {function can't be imported});
-  code_idx := func_idx - Length(importedFunctionTypes);
-  assert(code_idx < Length(codesec));
-  Result := codesec[code_idx];
+  assert(funcIdx >= Length(importedFunctionTypes) {function can't be imported});
+  codeIdx := funcIdx - Length(importedFunctionTypes);
+  assert(codeIdx < Length(codesec));
+  Result := codesec[codeIdx];
 end;
 
 function TModule.hasTable: Boolean;

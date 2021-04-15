@@ -20,10 +20,10 @@ type
     nop = $01,                 // 'nop'
     block = $02,               // 'block'
     loop = $03,                // 'loop'
-    if_ = $04,                 // 'if'
-    else_ = $05,               // 'else'
+    &if = $04,                 // 'if'
+    &else = $05,               // 'else'
     res06 = $06, res07 = $07, res08 = $08, res09 = $09, res0a = $0a,
-    end_ = $0B,                // 'end'
+    &end = $0B,                // 'end'
     br = $0C,                  // 'br'
     br_if = $0D,               // 'br_if'
     br_table = $0E,            // 'br_table'

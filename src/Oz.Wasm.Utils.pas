@@ -16,10 +16,10 @@ type
   TStd = record
     // Copies exactly count values from the range beginning
     // at first to the range beginning at result.
-    class function CopyN<T>(First: Pointer; Count: Cardinal; var R): Pointer; static;
+    class function CopyN<T>(First: Pointer; Count: Uint32; var R): Pointer; static;
     // Assigns the given value to the first count elements
     // in the range beginning at first if count > 0.
-    class procedure FillN<T>(First: Pointer; Count: Cardinal; const Value: T); static;
+    class procedure FillN<T>(First: Pointer; Count: Uint32; const Value: T); static;
   end;
 
 {$EndRegion}
@@ -33,12 +33,12 @@ type
     PItem = ^T;
   var
     FStart: PItem;
-    FSize: Cardinal;
+    FSize: Uint32;
     function GetItem(Index: Integer): T; inline;
   public
-    constructor From(start: PItem; size: Cardinal);
+    constructor From(start: PItem; size: Uint32);
     function Empty: Boolean;
-    property Size: Cardinal read FSize;
+    property Size: Uint32 read FSize;
     property Items[Index: Integer]: T read GetItem;
   end;
 
@@ -50,14 +50,14 @@ type
   strict private
     FItems: TArray<T>;
     function GetItem(Index: Integer): T; inline;
-    function GetSize: Cardinal; inline;
+    function GetSize: Uint32; inline;
   public
     procedure Push(Item: T);
     procedure Emplace(const Args: TArray<T>);
     function Pop: T;
     function Top: T;
     function Empty: Boolean;
-    property Size: Cardinal read GetSize;
+    property Size: Uint32 read GetSize;
     property Items[Index: Integer]: T read GetItem;
   end;
 
@@ -73,12 +73,11 @@ type
     FTop: PValue;
     FLocals: PValue;
     FBottom: PValue;
-    FSmallStorage: array [0..SmallStorageSize] of TValue;
+    FSmallStorage: array [0 .. SmallStorageSize] of TValue;
     FLargeStorage: TArray<TValue>;
     function GetItem(Index: Integer): PValue;
   public
-    constructor From(const args: PValue;
-      num_args, num_local_variables, max_stack_height: Cardinal);
+    constructor From(const args: PValue; numArgs, numLocalVariables, maxStackHeight: Uint32);
     // The current number of items on the stack (aka stack height).
     function Size: Uint32;
     // Pushes an item on the stack.
@@ -98,7 +97,7 @@ type
     function rend: PValue;
     function local(index: Integer): PValue;
     // Drop num items from the top of the stack.
-    procedure Drop(num: Cardinal);
+    procedure Drop(num: Uint32);
     // Returns the reference to the stack item on given position from the stack top.
     // Requires index < Size.
     property Items[Index: Integer]: PValue read GetItem;
@@ -110,7 +109,7 @@ implementation
 
 {$Region 'TStd'}
 
-class function TStd.CopyN<T>(First: Pointer; Count: Cardinal; var R): Pointer;
+class function TStd.CopyN<T>(First: Pointer; Count: Uint32; var R): Pointer;
 type
   Pt = ^T;
 var
@@ -128,7 +127,7 @@ begin
   Result := @R;
 end;
 
-class procedure TStd.FillN<T>(First: Pointer; Count: Cardinal; const Value: T);
+class procedure TStd.FillN<T>(First: Pointer; Count: Uint32; const Value: T);
 type
   Pt = ^T;
 var
@@ -147,7 +146,7 @@ end;
 
 {$Region 'TSpan<T>'}
 
-constructor TSpan<T>.From(start: PItem; size: Cardinal);
+constructor TSpan<T>.From(start: PItem; size: Uint32);
 begin
   FStart := start;
   FSize := size;
@@ -201,52 +200,52 @@ begin
   Result := FItems[Index];
 end;
 
-function TStack<T>.GetSize: Cardinal;
+function TStack<T>.GetSize: Uint32;
 begin
-  Result := Cardinal(Length(FItems));
+  Result := Uint32(Length(FItems));
 end;
 
 {$EndRegion}
 
 {$Region 'TOperandStack<T>'}
 
-procedure TOperandStack.Drop(num: Cardinal);
+procedure TOperandStack.Drop(num: Uint32);
 begin
-  Assert(num <= Cardinal(Size));
+  Assert(num <= Uint32(Size));
   Dec(FTop, num);
 end;
 
 constructor TOperandStack.From(const args: PValue;
-  num_args, num_local_variables, max_stack_height: Cardinal);
+  numArgs, numLocalVariables, maxStackHeight: Uint32);
 var
-  num_locals, num_locals_adjusted, storage_size_required: Cardinal;
-  local_variables: Pointer;
+  numLocals, numLocalsAdjusted, storageSizeRequired: Uint32;
+  localVariables: Pointer;
 begin
-  num_locals := num_args + num_local_variables;
+  numLocals := numArgs + numLocalVariables;
   // To avoid potential UB when there are no locals and the stack pointer
-  // is set to m_bottom - 1 (i.e. before storage array),
+  // is set to FBottom - 1 (i.e. before storage array),
   // we allocate one additional unused stack item.
-  num_locals_adjusted := num_locals + Cardinal(Ord(num_locals = 0)); // Bump to 1 if 0.
-  storage_size_required := num_locals_adjusted + max_stack_height;
+  numLocalsAdjusted := numLocals + Uint32(Ord(numLocals = 0)); // Bump to 1 if 0.
+  storageSizeRequired := numLocalsAdjusted + maxStackHeight;
 
-  if storage_size_required <= SmallStorageSize then
+  if storageSizeRequired <= SmallStorageSize then
     FLocals := @FSmallStorage[0]
   else
   begin
-    SetLength(FLargeStorage, storage_size_required);
+    SetLength(FLargeStorage, storageSizeRequired);
     FLocals := @FLargeStorage[0];
   end;
 
-  FBottom := PValue(PByte(FLocals) + num_locals_adjusted);
+  FBottom := PValue(PByte(FLocals) + numLocalsAdjusted);
   FTop := PValue(PByte(FBottom) - 1);
 
-  local_variables := TStd.CopyN<PValue>(args, num_args, FLocals^);
-  TStd.FillN<TValue>(local_variables, num_local_variables, TValue.From(0));
+  localVariables := TStd.CopyN<PValue>(args, numArgs, FLocals^);
+  TStd.FillN<TValue>(localVariables, numLocalVariables, TValue.From(0));
 end;
 
 function TOperandStack.GetItem(Index: Integer): PValue;
 begin
-  Assert(index < size);
+  Assert(index < Size);
   Result := PValue(PByte(FTop) - Index * sizeof(TValue));
 end;
 
@@ -291,13 +290,13 @@ end;
 
 function TOperandStack.Top: PValue;
 begin
-  Assert(size <> 0);
+  Assert(Size <> 0);
   Result := FTop;
 end;
 
 function TOperandStack.Pop: TValue;
 begin
-  Assert(size <> 0);
+  Assert(Size <> 0);
   Result := FTop^;
   Dec(FTop, sizeof(TValue));
 end;

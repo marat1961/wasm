@@ -38,17 +38,17 @@ type
   // associated with memory types and table types.
   // If no maximum is given, the respective storage can grow to any size.
   TLimits = record
-    min: Cardinal;
-    max: Cardinal;
+    min: Uint32;
+    max: Uint32;
   end;
 
   // All indices are encoded with their respective value.
-  type TTypeIdx = Cardinal;
-  type TFuncIdx = Cardinal;
-  type TTableIdx = Cardinal;
-  type TMemIdx = Cardinal;
-  type TGlobalIdx = Cardinal;
-  type TLocalIdx = Cardinal;
+  type TTypeIdx = Uint32;
+  type TFuncIdx = Uint32;
+  type TTableIdx = Uint32;
+  type TMemIdx = Uint32;
+  type TGlobalIdx = Uint32;
+  type TLocalIdx = Uint32;
 
   // Code Section
   // Each section consists of
@@ -85,7 +85,7 @@ type
     table = 4,
     memory = 5,
     global = 6,
-    export_ = 7,
+    &export = 7,
     start = 8,
     element = 9,
     code = 10,
@@ -93,7 +93,7 @@ type
 
   // Function locals.
   TLocals = record
-    count: Cardinal;
+    count: Uint32;
     typ: TValType;
   end;
 
@@ -112,12 +112,12 @@ type
     kind: TKind;
     case Integer of
       0: (constant: TValue);
-      1: (global_index: Cardinal);
+      1: (globalIndex: Uint32);
   end;
 
   TGlobalType = record
-    value_type: TValType;
-    is_mutable: Boolean;
+    valueType: TValType;
+    isMutable: Boolean;
   end;
 
   TGlobal = record
@@ -133,7 +133,7 @@ type
 
   TDescUnion = record
     case Integer of
-      0: (function_type_index: TTypeIdx);
+      0: (functionTypeIndex: TTypeIdx);
       1: (memory: TMemory);
       2: (global: TGlobalType);
       3: (table: TTable);
@@ -149,7 +149,7 @@ type
   TExport = record
     name: string;
     kind: TExternalKind;
-    index: Cardinal;
+    index: Uint32;
   end;
 
   TElement = record
@@ -159,8 +159,8 @@ type
 
   // The element of the code section.
   TCode = record
-    max_stack_height: Integer;
-    local_count: Cardinal;
+    maxStackHeight: Integer;
+    localCount: Uint32;
     // The instructions bytecode interleaved with decoded immediate values.
     instructions: TArray<Byte>;
   end;

@@ -160,7 +160,7 @@ type
     memoryLimits: TLimits;
     // Hard limit for memory growth in pages, checked when memory is defined
     // as unbounded in module.
-    memoryPagesLimit: Cardinal;
+    memoryPagesLimit: Uint32;
     // Instance table.
     table: PTable;
     // Table limits.
@@ -175,7 +175,7 @@ type
     constructor From(const module: TModule;
       const memory: TBytes;
       const memoryLimits: TLimits;
-      const memoryPagesLimit: Cardinal;
+      const memoryPagesLimit: Uint32;
       table: PTable; tableLimits: TLimits;
       const globals: TArray<TValue>;
       const importedFunctions: TArray<TExternalFunction>;
@@ -229,8 +229,8 @@ type
 
   PByteHelper = record helper for PByte
     function read<T>: T; inline;
-    procedure store<T>(offset: Cardinal; value: T); inline;
-    function load<T>(offset: Cardinal): T; inline;
+    procedure store<T>(offset: Uint32; value: T); inline;
+    function load<T>(offset: Uint32): T; inline;
   end;
 
 {$EndRegion}
@@ -450,7 +450,7 @@ end;
 {$Region 'TInstance'}
 
 constructor TInstance.From(const module: TModule; const memory: TBytes;
-  const memoryLimits: TLimits; const memoryPagesLimit: Cardinal;
+  const memoryLimits: TLimits; const memoryPagesLimit: Uint32;
   table: PTable; tableLimits: TLimits;
   const globals: TArray<TValue>;
   const importedFunctions: TArray<TExternalFunction>;
@@ -478,13 +478,13 @@ begin
   Inc(Self, sizeof(T));
 end;
 
-procedure PByteHelper.store<T>(offset: Cardinal; value: T);
+procedure PByteHelper.store<T>(offset: Uint32; value: T);
 type Pt = ^T;
 begin
   Pt(Self + offset)^ := value;
 end;
 
-function PByteHelper.load<T>(offset: Cardinal): T;
+function PByteHelper.load<T>(offset: Uint32): T;
 type Pt = ^T;
 begin
   Result := Pt(Self + offset)^;
@@ -500,7 +500,7 @@ begin
   Self.code := instance.module.getCode(funcIdx);
   Self.memory := instance.memory;
   Self.funcType := instance.module.getFunctionType(funcIdx);
-  Self.stack := TOperandStack.From(args, Length(funcType.inputs), code.local_count, code.max_stack_height);
+  Self.stack := TOperandStack.From(args, Length(funcType.inputs), code.localCount, code.maxStackHeight);
   Self.pc := @code.instructions[0];
 end;
 
@@ -628,7 +628,7 @@ begin
         goto traps;
       TInstruction.nop, TInstruction.block, TInstruction.loop:
         ;
-      TInstruction.if_:
+      TInstruction.if:
         begin
           if stack.pop.AsUint32 <> 0 then
             pc := pc + sizeof(Uint32)  // Skip the immediate for else instruction.
@@ -638,14 +638,14 @@ begin
             pc := PByte(@code.instructions[0]) + target_pc;
           end;
         end;
-      TInstruction.else_:
+      TInstruction.else:
         begin
           // We reach else only after executing if block ("then" part),
           // so we need to skip else block now.
           var target_pc := pc.read<Uint32>;
           pc := PByte(@code.instructions[0]) + target_pc;
         end;
-      TInstruction.end_:
+      TInstruction.end:
         begin
           // End execution if it's a final end instruction.
           if pc = @code.instructions[Length(code.instructions)] then
@@ -747,14 +747,14 @@ begin
           var idx := pc.read<Uint32>;
           if idx < Uint32(Length(instance.importedGlobals)) then
           begin
-            assert(instance.importedGlobals[idx].typ.is_mutable);
+            assert(instance.importedGlobals[idx].typ.isMutable);
             instance.importedGlobals[idx].value := stack.pop;
           end
           else
           begin
             var module_global_idx := idx - Uint32(Length(instance.importedGlobals));
             assert(module_global_idx < Uint32(Length(instance.module.globalsec)));
-            assert(instance.module.globalsec[module_global_idx].typ.is_mutable);
+            assert(instance.module.globalsec[module_global_idx].typ.isMutable);
             instance.globals[module_global_idx] := stack.pop;
           end;
         end;
@@ -1598,7 +1598,7 @@ begin
     exit(Trap);
 
   Assert(Length(instance.module.importedFunctionTypes) = Length(instance.importedFunctions));
-  if funcIdx < Cardinal(Length(instance.importedFunctions)) then
+  if funcIdx < Uint32(Length(instance.importedFunctions)) then
     exit(instance.importedFunctions[funcIdx].func.Call(instance, args, ctx));
 
   vm.Init(instance, funcIdx, args);
