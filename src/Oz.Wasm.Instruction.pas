@@ -9,13 +9,11 @@ interface
 uses
   Oz.Wasm.Value;
 
-{$T+}
-{$SCOPEDENUMS ON}
+{$Region 'TInstruction'}
 
 type
-
-  // control Instructions
   TInstruction = (
+    // control instructions
     unreachable = $00,         // 'unreachable'
     nop = $01,                 // 'nop'
     block = $02,               // 'block'
@@ -32,7 +30,7 @@ type
     call_indirect = $11,       // 'call_indirect'
     res13 = $13, res14 = $14, res15 = $15, res16 = $16, res17 = $17, res18 = $18,
 
-    // parametric Instructions
+    // parametric instructions
     drop = $1A,                // 'drop'
     select = $1B,              // 'select'
     res1D = $1D, res1E = $1E, res1F = $1F,
@@ -208,6 +206,117 @@ type
     i64_extend16_s = $C3,      // i64.extend16_s
     i64_extend32_s = $C4);     // i64.extend32_s
 
+{$EndRegion}
+
+{$Region 'Operations'}
+
+function rotl(lhs, rhs: Uint32): Uint32; inline;
+function rotr(lhs, rhs: Uint32): Uint32; inline;
+function clz32(value: Uint32): Uint32;
+function ctz32(value: Uint32): Uint32;
+function popcount32(value: Uint32): Uint32;
+function clz64(value: Uint64): Uint64;
+function ctz64(value: Uint64): Uint64;
+function popcount64(value: Uint64): Uint64;
+
+{$EndRegion}
+
 implementation
 
+{$Region 'Operations'}
+
+function rotl(lhs, rhs: Uint32): Uint32;
+const
+  Bits = sizeof(Uint32);
+begin
+  var k := rhs and (Bits - 1);
+  if k = 0 then exit(lhs);
+  Result := (lhs shl k) or (lhs shr (Bits - k));
+end;
+
+function rotr(lhs, rhs: Uint32): Uint32;
+const
+  Bits = sizeof(Uint32);
+begin
+  var k := rhs and (Bits - 1);
+  if k = 0 then exit(lhs);
+  Result := (lhs shr k) or (lhs shl (Bits - k));
+end;
+
+function __builtin_clz(x: Uint32): Uint32;
+begin
+{$IF Defined(CPUX64)}
+  asm
+    BSR   ECX,ECX
+    XOR   EAX,$31
+ end
+{$ENDIF}
+{$IF Defined(CPUX86)}
+  asm
+    BSR   EAX,EAX
+    XOR   EAX,$31
+  end;
+{$ENDIF}
+end;
+
+function __builtin_ctz(x: Uint32): Uint32;
+begin
+
+end;
+
+function __builtin_clzll(x: Uint64): Uint64;
+begin
+
+end;
+
+function __builtin_ctzll(x: Uint64): Uint64;
+begin
+
+end;
+
+function clz32(value: Uint32): Uint32;
+begin
+  if value = 0 then
+    Result := 32
+  else
+    Result := __builtin_clz(value);
+end;
+
+function ctz32(value: Uint32): Uint32;
+begin
+  if value = 0 then
+    Result := 32
+  else
+    Result := __builtin_ctz(value);
+end;
+
+function popcount32(value: Uint32): Uint32;
+begin
+
+end;
+
+function clz64(value: Uint64): Uint64;
+begin
+  if value = 0 then
+    Result := 64
+  else
+    Result := __builtin_clzll(value);
+end;
+
+function ctz64(value: Uint64): Uint64;
+begin
+  if value = 0 then
+    Result := 64
+  else
+    Result := __builtin_ctzll(value);
+end;
+
+function popcount64(value: Uint64): Uint64;
+begin
+
+end;
+
+{$EndRegion}
+
 end.
+
