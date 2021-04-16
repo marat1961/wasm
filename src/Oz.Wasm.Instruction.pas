@@ -259,8 +259,14 @@ asm
 end;
 
 function __builtin_ctz(x: Uint32): Uint32;
-begin
-
+asm
+{$IF Defined(CPUX64)}
+  BSF     ECX,ECX
+  MOV     EAX,ECX
+{$ENDIF}
+{$IF Defined(CPUX86)}
+  BSF     EAX,EAX
+{$ENDIF}
 end;
 
 function __builtin_clzll(x: Uint64): Uint64;
