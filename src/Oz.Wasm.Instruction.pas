@@ -244,18 +244,17 @@ begin
 end;
 
 function __builtin_clz(x: Uint32): Uint32;
-begin
+asm
 {$IF Defined(CPUX64)}
-  asm
-    BSR   ECX,ECX
-    XOR   EAX,$31
- end
+  BSR     ECX,ECX
+  NEG     ECX
+  ADD     ECX,31
+  MOV     EAX,ECX
 {$ENDIF}
 {$IF Defined(CPUX86)}
-  asm
-    BSR   EAX,EAX
-    XOR   EAX,$31
-  end;
+  BSR     EAX,EAX
+  NEG     EAX
+  ADD     EAX,31
 {$ENDIF}
 end;
 

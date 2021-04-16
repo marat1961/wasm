@@ -84,6 +84,14 @@
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
         <DCCReference Include="Oz.Tests.pas"/>
+        <DCCReference Include="..\src\Oz.Wasm.Instruction.pas"/>
+        <DCCReference Include="..\src\Oz.Wasm.Interpreter.pas"/>
+        <DCCReference Include="..\src\Oz.Wasm.Limits.pas"/>
+        <DCCReference Include="..\src\Oz.Wasm.Module.pas"/>
+        <DCCReference Include="..\src\Oz.Wasm.Types.pas"/>
+        <DCCReference Include="..\src\Oz.Wasm.Utils.pas"/>
+        <DCCReference Include="..\src\Oz.Wasm.Value.pas"/>
+        <DCCReference Include="Oz.Wasm.TestNumeric.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

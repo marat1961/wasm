@@ -1,18 +1,23 @@
+(* Oz.Wasm: A fast Delphi WebAssembly interpreter
+ * Copyright (c) 2021 Tomsk, Marat Shaimardanov
+ * SPDX-License-Identifier: (GPL-3.0-or-later OR Apache-2.0)
+ *)
 unit Oz.Tests;
 
 interface
 
 uses
-  TestFramework, System.SysUtils, System.Math, DUnitX.TestFramework;
+  System.SysUtils, System.Math, TestFramework, DUnitX.TestFramework,
+  Oz.Wasm.Instruction;
 
 type
 
   Tst = class(TObject)
   const
-    F32AbsMask: Uint32 = $7fffffff;
-    F32SignMask: Uint32 = Uint32(not $7fffffff);
-    F64AbsMask: Uint64 = $fffffffffffffff;
-    F64SignMask: Uint64 = Uint64(not $fffffffffffffff);
+    F32AbsMask = Uint32($7fffffff);
+    F32SignMask = Uint32(not $7fffffff);
+    F64AbsMask = Uint64($fffffffffffffff);
+    F64SignMask = Uint64(not $fffffffffffffff);
   public
     function MinSingle(a, b: Single): Single;
   end;
@@ -73,7 +78,6 @@ begin
 end;
 
 initialization
-
   RegisterTest(TestTst.Suite);
 end.
 
