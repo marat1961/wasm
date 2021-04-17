@@ -208,8 +208,8 @@ type
 
 {$EndRegion}
 
-  // Wasm 1.0 spec only has instructions which take at most 2 items
-  // and return at most 1 item.
+{$Region 'Instruction type  and align'}
+
   TValType = (
     none = 0,
     i32 = $7f,
@@ -217,19 +217,28 @@ type
     f32 = $7d,
     f64 = $7c);
 
-  PInstructionType = ^TInstructionType;
+  // Wasm 1.0 spec only has instructions which take at most 2 items
+  // and return at most 1 item.
   TInstructionType = record
     inputs: array [0..1] of TValType;
     outputs: TValType;
   end;
 
-function get_instruction_type_table: PInstructionType;
+  PInstructionTypeTable = ^TInstructionTypeTable;
+  TInstructionTypeTable = array [TInstruction] of TInstructionType;
 
-// Returns the table of max alignment values for each instruction - the largest acceptable
-// alignment value satisfying `2 ** max_align < memory_width` where memory_width is the number of
-// bytes the instruction operates on.
+  PInstructionMaxAlignTable = ^TInstructionMaxAlignTable;
+  TInstructionMaxAlignTable = array [TInstruction] of Byte;
+
+function get_instruction_type_table: PInstructionTypeTable;
+
+// Returns the table of max alignment values for each instruction - the largest
+// acceptable alignment value satisfying `2 ** max_align < memory_width`
+// where memory_width is the number of bytes the instruction operates on.
 // It may contain invalid value for instructions not needing it.
-function get_instruction_max_align_table: Byte;
+function get_instruction_max_align_table: PInstructionMaxAlignTable;
+
+{$EndRegion}
 
 {$Region 'Operations'}
 
@@ -246,229 +255,468 @@ function popcount64(value: Uint64): Uint64;
 
 implementation
 
+{$Region 'InstructionTypes'}
+
 const
   // Order of input parameters is the order they are popped from stack,
   // which is consistent with the order in FuncType::inputs.
-  InstructionTypes: array [TInstruction] of TInstructionType = (
+  InstructionTypes: TInstructionTypeTable = (
 
     // 5.4.1 Control instructions
-    (* unreachable         = 0x00 *) (),
-    (* nop                 = 0x01 *) (),
-    (* block               = 0x02 *) (),
-    (* loop                = 0x03 *) (),
-    (* if_                 = 0x04 *) (inputs: (i32, none)),
-    (* else_               = 0x05 *) (),
-    (*                       0x06 *) (),
-    (*                       0x07 *) (),
-    (*                       0x08 *) (),
-    (*                       0x09 *) (),
-    (*                       0x0a *) (),
-    (* end                 = 0x0b *) (),
-    (* br                  = 0x0c *) (),
-    (* br_if               = 0x0d *) (inputs: (i32, none)),
-    (* br_table            = 0x0e *) (inputs: (i32, none)),
-    (* return_             = 0x0f *) (),
+    (* unreachable         = $00 *) (),
+    (* nop                 = $01 *) (),
+    (* block               = $02 *) (),
+    (* loop                = $03 *) (),
+    (* if_                 = $04 *) (inputs: (i32, none)),
+    (* else_               = $05 *) (),
+    (*                       $06 *) (),
+    (*                       $07 *) (),
+    (*                       $08 *) (),
+    (*                       $09 *) (),
+    (*                       $0a *) (),
+    (* end                 = $0b *) (),
+    (* br                  = $0c *) (),
+    (* br_if               = $0d *) (inputs: (i32, none)),
+    (* br_table            = $0e *) (inputs: (i32, none)),
+    (* return_             = $0f *) (),
 
-    (* call                = 0x10 *) (),
-    (* call_indirect       = 0x11 *) (inputs: (i32, none)),
+    (* call                = $10 *) (),
+    (* call_indirect       = $11 *) (inputs: (i32, none)),
 
-    (*                       0x12 *) (),
-    (*                       0x13 *) (),
-    (*                       0x14 *) (),
-    (*                       0x15 *) (),
-    (*                       0x16 *) (),
-    (*                       0x17 *) (),
-    (*                       0x18 *) (),
-    (*                       0x19 *) (),
+    (*                       $12 *) (),
+    (*                       $13 *) (),
+    (*                       $14 *) (),
+    (*                       $15 *) (),
+    (*                       $16 *) (),
+    (*                       $17 *) (),
+    (*                       $18 *) (),
+    (*                       $19 *) (),
 
     // 5.4.2 Parametric instructions
     // Stack polymorphic instructions - validated at instruction handler in expression parser.
-    (* drop                = 0x1a *) (),
-    (* select              = 0x1b *) (inputs: (i32, none)),
+    (* drop                = $1a *) (),
+    (* select              = $1b *) (inputs: (i32, none)),
 
-    (*                       0x1c *) (),
-    (*                       0x1d *) (),
-    (*                       0x1e *) (),
-    (*                       0x1f *) (),
+    (*                       $1c *) (),
+    (*                       $1d *) (),
+    (*                       $1e *) (),
+    (*                       $1f *) (),
 
     // 5.4.3 Variable instructions
     // Stack polymorphic instructions - validated at instruction handler in expression parser.
-    (* local_get           = 0x20 *) (),
-    (* local_set           = 0x21 *) (),
-    (* local_tee           = 0x22 *) (),
-    (* global_get          = 0x23 *) (),
-    (* global_set          = 0x24 *) (),
+    (* local_get           = $20 *) (),
+    (* local_set           = $21 *) (),
+    (* local_tee           = $22 *) (),
+    (* global_get          = $23 *) (),
+    (* global_set          = $24 *) (),
 
-    (*                       0x25 *) (),
-    (*                       0x26 *) (),
-    (*                       0x27 *) (),
+    (*                       $25 *) (),
+    (*                       $26 *) (),
+    (*                       $27 *) (),
 
     // 5.4.4 Memory instructions
-    (* i32_load            = 0x28 *) (inputs: (i32, none); outputs: (i32)),
-    (* i64_load            = 0x29 *) (inputs: (i32, none); outputs: (i64)),
-    (* f32_load            = 0x2a *) (inputs: (i32, none); outputs: (f32)),
-    (* f64_load            = 0x2b *) (inputs: (i32, none); outputs: (f64)),
-    (* i32_load8_s         = 0x2c *) (inputs: (i32, none); outputs: (i32)),
-    (* i32_load8_u         = 0x2d *) (inputs: (i32, none); outputs: (i32)),
-    (* i32_load16_s        = 0x2e *) (inputs: (i32, none); outputs: (i32)),
-    (* i32_load16_u        = 0x2f *) (inputs: (i32, none); outputs: (i32)),
-    (* i64_load8_s         = 0x30 *) (inputs: (i32, none); outputs: (i64)),
-    (* i64_load8_u         = 0x31 *) (inputs: (i32, none); outputs: (i64)),
-    (* i64_load16_s        = 0x32 *) (inputs: (i32, none); outputs: (i64)),
-    (* i64_load16_u        = 0x33 *) (inputs: (i32, none); outputs: (i64)),
-    (* i64_load32_s        = 0x34 *) (inputs: (i32, none); outputs: (i64)),
-    (* i64_load32_u        = 0x35 *) (inputs: (i32, none); outputs: (i64)),
-    (* i32_store           = 0x36 *) (inputs: (i32, i32)),
-    (* i64_store           = 0x37 *) (inputs: (i32, i64)),
-    (* f32_store           = 0x38 *) (inputs: (i32, f32)),
-    (* f64_store           = 0x39 *) (inputs: (i32, f64)),
-    (* i32_store8          = 0x3a *) (inputs: (i32, i32)),
-    (* i32_store16         = 0x3b *) (inputs: (i32, i32)),
-    (* i64_store8          = 0x3c *) (inputs: (i32, i64)),
-    (* i64_store16         = 0x3d *) (inputs: (i32, i64)),
-    (* i64_store32         = 0x3e *) (inputs: (i32, i64)),
-    (* memory_size         = 0x3f *) (outputs: (i32)),
-    (* memory_grow         = 0x40 *) (inputs: (i32, none); outputs: (i32)),
+    (* i32_load            = $28 *) (inputs: (i32, none); outputs: (i32)),
+    (* i64_load            = $29 *) (inputs: (i32, none); outputs: (i64)),
+    (* f32_load            = $2a *) (inputs: (i32, none); outputs: (f32)),
+    (* f64_load            = $2b *) (inputs: (i32, none); outputs: (f64)),
+    (* i32_load8_s         = $2c *) (inputs: (i32, none); outputs: (i32)),
+    (* i32_load8_u         = $2d *) (inputs: (i32, none); outputs: (i32)),
+    (* i32_load16_s        = $2e *) (inputs: (i32, none); outputs: (i32)),
+    (* i32_load16_u        = $2f *) (inputs: (i32, none); outputs: (i32)),
+    (* i64_load8_s         = $30 *) (inputs: (i32, none); outputs: (i64)),
+    (* i64_load8_u         = $31 *) (inputs: (i32, none); outputs: (i64)),
+    (* i64_load16_s        = $32 *) (inputs: (i32, none); outputs: (i64)),
+    (* i64_load16_u        = $33 *) (inputs: (i32, none); outputs: (i64)),
+    (* i64_load32_s        = $34 *) (inputs: (i32, none); outputs: (i64)),
+    (* i64_load32_u        = $35 *) (inputs: (i32, none); outputs: (i64)),
+    (* i32_store           = $36 *) (inputs: (i32, i32)),
+    (* i64_store           = $37 *) (inputs: (i32, i64)),
+    (* f32_store           = $38 *) (inputs: (i32, f32)),
+    (* f64_store           = $39 *) (inputs: (i32, f64)),
+    (* i32_store8          = $3a *) (inputs: (i32, i32)),
+    (* i32_store16         = $3b *) (inputs: (i32, i32)),
+    (* i64_store8          = $3c *) (inputs: (i32, i64)),
+    (* i64_store16         = $3d *) (inputs: (i32, i64)),
+    (* i64_store32         = $3e *) (inputs: (i32, i64)),
+    (* memory_size         = $3f *) (outputs: (i32)),
+    (* memory_grow         = $40 *) (inputs: (i32, none); outputs: (i32)),
 
     // 5.4.5 Numeric instructions
-    (* i32_const           = 0x41 *) (outputs: (i32)),
-    (* i64_const           = 0x42 *) (outputs: (i64)),
-    (* f32_const           = 0x43 *) (outputs: (f32)),
-    (* f64_const           = 0x44 *) (outputs: (f64)),
+    (* i32_const           = $41 *) (outputs: (i32)),
+    (* i64_const           = $42 *) (outputs: (i64)),
+    (* f32_const           = $43 *) (outputs: (f32)),
+    (* f64_const           = $44 *) (outputs: (f64)),
 
-    (* i32_eqz             = 0x45 *) (inputs: (i32, none); outputs: (i32)),
-    (* i32_eq              = 0x46 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_ne              = 0x47 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_lt_s            = 0x48 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_lt_u            = 0x49 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_gt_s            = 0x4a *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_gt_u            = 0x4b *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_le_s            = 0x4c *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_le_u            = 0x4d *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_ge_s            = 0x4e *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_ge_u            = 0x4f *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_eqz             = $45 *) (inputs: (i32, none); outputs: (i32)),
+    (* i32_eq              = $46 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_ne              = $47 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_lt_s            = $48 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_lt_u            = $49 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_gt_s            = $4a *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_gt_u            = $4b *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_le_s            = $4c *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_le_u            = $4d *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_ge_s            = $4e *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_ge_u            = $4f *) (inputs: (i32, i32); outputs: (i32)),
 
-    (* i64_eqz             = 0x50 *) (inputs: (i64, none); outputs: (i32)),
-    (* i64_eq              = 0x51 *) (inputs: (i64, i64); outputs: (i32)),
-    (* i64_ne              = 0x52 *) (inputs: (i64, i64); outputs: (i32)),
-    (* i64_lt_s            = 0x53 *) (inputs: (i64, i64); outputs: (i32)),
-    (* i64_lt_u            = 0x54 *) (inputs: (i64, i64); outputs: (i32)),
-    (* i64_gt_s            = 0x55 *) (inputs: (i64, i64); outputs: (i32)),
-    (* i64_gt_u            = 0x56 *) (inputs: (i64, i64); outputs: (i32)),
-    (* i64_le_s            = 0x57 *) (inputs: (i64, i64); outputs: (i32)),
-    (* i64_le_u            = 0x58 *) (inputs: (i64, i64); outputs: (i32)),
-    (* i64_ge_s            = 0x59 *) (inputs: (i64, i64); outputs: (i32)),
-    (* i64_ge_u            = 0x5a *) (inputs: (i64, i64); outputs: (i32)),
+    (* i64_eqz             = $50 *) (inputs: (i64, none); outputs: (i32)),
+    (* i64_eq              = $51 *) (inputs: (i64, i64); outputs: (i32)),
+    (* i64_ne              = $52 *) (inputs: (i64, i64); outputs: (i32)),
+    (* i64_lt_s            = $53 *) (inputs: (i64, i64); outputs: (i32)),
+    (* i64_lt_u            = $54 *) (inputs: (i64, i64); outputs: (i32)),
+    (* i64_gt_s            = $55 *) (inputs: (i64, i64); outputs: (i32)),
+    (* i64_gt_u            = $56 *) (inputs: (i64, i64); outputs: (i32)),
+    (* i64_le_s            = $57 *) (inputs: (i64, i64); outputs: (i32)),
+    (* i64_le_u            = $58 *) (inputs: (i64, i64); outputs: (i32)),
+    (* i64_ge_s            = $59 *) (inputs: (i64, i64); outputs: (i32)),
+    (* i64_ge_u            = $5a *) (inputs: (i64, i64); outputs: (i32)),
 
-    (* f32_eq              = 0x5b *) (inputs: (f32, f32); outputs: (i32)),
-    (* f32_ne              = 0x5c *) (inputs: (f32, f32); outputs: (i32)),
-    (* f32_lt              = 0x5d *) (inputs: (f32, f32); outputs: (i32)),
-    (* f32_gt              = 0x5e *) (inputs: (f32, f32); outputs: (i32)),
-    (* f32_le              = 0x5f *) (inputs: (f32, f32); outputs: (i32)),
-    (* f32_ge              = 0x60 *) (inputs: (f32, f32); outputs: (i32)),
+    (* f32_eq              = $5b *) (inputs: (f32, f32); outputs: (i32)),
+    (* f32_ne              = $5c *) (inputs: (f32, f32); outputs: (i32)),
+    (* f32_lt              = $5d *) (inputs: (f32, f32); outputs: (i32)),
+    (* f32_gt              = $5e *) (inputs: (f32, f32); outputs: (i32)),
+    (* f32_le              = $5f *) (inputs: (f32, f32); outputs: (i32)),
+    (* f32_ge              = $60 *) (inputs: (f32, f32); outputs: (i32)),
 
-    (* f64_eq              = 0x61 *) (inputs: (f64, f64); outputs: (i32)),
-    (* f64_ne              = 0x62 *) (inputs: (f64, f64); outputs: (i32)),
-    (* f64_lt              = 0x63 *) (inputs: (f64, f64); outputs: (i32)),
-    (* f64_gt              = 0x64 *) (inputs: (f64, f64); outputs: (i32)),
-    (* f64_le              = 0x65 *) (inputs: (f64, f64); outputs: (i32)),
-    (* f64_ge              = 0x66 *) (inputs: (f64, f64); outputs: (i32)),
+    (* f64_eq              = $61 *) (inputs: (f64, f64); outputs: (i32)),
+    (* f64_ne              = $62 *) (inputs: (f64, f64); outputs: (i32)),
+    (* f64_lt              = $63 *) (inputs: (f64, f64); outputs: (i32)),
+    (* f64_gt              = $64 *) (inputs: (f64, f64); outputs: (i32)),
+    (* f64_le              = $65 *) (inputs: (f64, f64); outputs: (i32)),
+    (* f64_ge              = $66 *) (inputs: (f64, f64); outputs: (i32)),
 
-    (* i32_clz             = 0x67 *) (inputs: (i32, none); outputs: (i32)),
-    (* i32_ctz             = 0x68 *) (inputs: (i32, none); outputs: (i32)),
-    (* i32_popcnt          = 0x69 *) (inputs: (i32, none); outputs: (i32)),
-    (* i32_add             = 0x6a *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_sub             = 0x6b *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_mul             = 0x6c *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_div_s           = 0x6d *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_div_u           = 0x6e *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_rem_s           = 0x6f *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_rem_u           = 0x70 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_and             = 0x71 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_or              = 0x72 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_xor             = 0x73 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_shl             = 0x74 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_shr_s           = 0x75 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_shr_u           = 0x76 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_rotl            = 0x77 *) (inputs: (i32, i32); outputs: (i32)),
-    (* i32_rotr            = 0x78 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_clz             = $67 *) (inputs: (i32, none); outputs: (i32)),
+    (* i32_ctz             = $68 *) (inputs: (i32, none); outputs: (i32)),
+    (* i32_popcnt          = $69 *) (inputs: (i32, none); outputs: (i32)),
+    (* i32_add             = $6a *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_sub             = $6b *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_mul             = $6c *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_div_s           = $6d *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_div_u           = $6e *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_rem_s           = $6f *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_rem_u           = $70 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_and             = $71 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_or              = $72 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_xor             = $73 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_shl             = $74 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_shr_s           = $75 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_shr_u           = $76 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_rotl            = $77 *) (inputs: (i32, i32); outputs: (i32)),
+    (* i32_rotr            = $78 *) (inputs: (i32, i32); outputs: (i32)),
 
-    (* i64_clz             = 0x79 *) (inputs: (i64, none); outputs: (i64)),
-    (* i64_ctz             = 0x7a *) (inputs: (i64, none); outputs: (i64)),
-    (* i64_popcnt          = 0x7b *) (inputs: (i64, none); outputs: (i64)),
-    (* i64_add             = 0x7c *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_sub             = 0x7d *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_mul             = 0x7e *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_div_s           = 0x7f *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_div_u           = 0x80 *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_rem_s           = 0x81 *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_rem_u           = 0x82 *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_and             = 0x83 *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_or              = 0x84 *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_xor             = 0x85 *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_shl             = 0x86 *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_shr_s           = 0x87 *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_shr_u           = 0x88 *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_rotl            = 0x89 *) (inputs: (i64, i64); outputs: (i64)),
-    (* i64_rotr            = 0x8a *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_clz             = $79 *) (inputs: (i64, none); outputs: (i64)),
+    (* i64_ctz             = $7a *) (inputs: (i64, none); outputs: (i64)),
+    (* i64_popcnt          = $7b *) (inputs: (i64, none); outputs: (i64)),
+    (* i64_add             = $7c *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_sub             = $7d *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_mul             = $7e *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_div_s           = $7f *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_div_u           = $80 *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_rem_s           = $81 *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_rem_u           = $82 *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_and             = $83 *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_or              = $84 *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_xor             = $85 *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_shl             = $86 *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_shr_s           = $87 *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_shr_u           = $88 *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_rotl            = $89 *) (inputs: (i64, i64); outputs: (i64)),
+    (* i64_rotr            = $8a *) (inputs: (i64, i64); outputs: (i64)),
 
-    (* f32_abs             = 0x8b *) (inputs: (f32, none); outputs: (f32)),
-    (* f32_neg             = 0x8c *) (inputs: (f32, none); outputs: (f32)),
-    (* f32_ceil            = 0x8d *) (inputs: (f32, none); outputs: (f32)),
-    (* f32_floor           = 0x8e *) (inputs: (f32, none); outputs: (f32)),
-    (* f32_trunc           = 0x8f *) (inputs: (f32, none); outputs: (f32)),
-    (* f32_nearest         = 0x90 *) (inputs: (f32, none); outputs: (f32)),
-    (* f32_sqrt            = 0x91 *) (inputs: (f32, none); outputs: (f32)),
-    (* f32_add             = 0x92 *) (inputs: (f32, f32); outputs: (f32)),
-    (* f32_sub             = 0x93 *) (inputs: (f32, f32); outputs: (f32)),
-    (* f32_mul             = 0x94 *) (inputs: (f32, f32); outputs: (f32)),
-    (* f32_div             = 0x95 *) (inputs: (f32, f32); outputs: (f32)),
-    (* f32_min             = 0x96 *) (inputs: (f32, f32); outputs: (f32)),
-    (* f32_max             = 0x97 *) (inputs: (f32, f32); outputs: (f32)),
-    (* f32_copysign        = 0x98 *) (inputs: (f32, f32); outputs: (f32)),
+    (* f32_abs             = $8b *) (inputs: (f32, none); outputs: (f32)),
+    (* f32_neg             = $8c *) (inputs: (f32, none); outputs: (f32)),
+    (* f32_ceil            = $8d *) (inputs: (f32, none); outputs: (f32)),
+    (* f32_floor           = $8e *) (inputs: (f32, none); outputs: (f32)),
+    (* f32_trunc           = $8f *) (inputs: (f32, none); outputs: (f32)),
+    (* f32_nearest         = $90 *) (inputs: (f32, none); outputs: (f32)),
+    (* f32_sqrt            = $91 *) (inputs: (f32, none); outputs: (f32)),
+    (* f32_add             = $92 *) (inputs: (f32, f32); outputs: (f32)),
+    (* f32_sub             = $93 *) (inputs: (f32, f32); outputs: (f32)),
+    (* f32_mul             = $94 *) (inputs: (f32, f32); outputs: (f32)),
+    (* f32_div             = $95 *) (inputs: (f32, f32); outputs: (f32)),
+    (* f32_min             = $96 *) (inputs: (f32, f32); outputs: (f32)),
+    (* f32_max             = $97 *) (inputs: (f32, f32); outputs: (f32)),
+    (* f32_copysign        = $98 *) (inputs: (f32, f32); outputs: (f32)),
 
-    (* f64_abs             = 0x99 *) (inputs: (f64, none); outputs: (f64)),
-    (* f64_neg             = 0x9a *) (inputs: (f64, none); outputs: (f64)),
-    (* f64_ceil            = 0x9b *) (inputs: (f64, none); outputs: (f64)),
-    (* f64_floor           = 0x9c *) (inputs: (f64, none); outputs: (f64)),
-    (* f64_trunc           = 0x9d *) (inputs: (f64, none); outputs: (f64)),
-    (* f64_nearest         = 0x9e *) (inputs: (f64, none); outputs: (f64)),
-    (* f64_sqrt            = 0x9f *) (inputs: (f64, none); outputs: (f64)),
-    (* f64_add             = 0xa0 *) (inputs: (f64, f64); outputs: (f64)),
-    (* f64_sub             = 0xa1 *) (inputs: (f64, f64); outputs: (f64)),
-    (* f64_mul             = 0xa2 *) (inputs: (f64, f64); outputs: (f64)),
-    (* f64_div             = 0xa3 *) (inputs: (f64, f64); outputs: (f64)),
-    (* f64_min             = 0xa4 *) (inputs: (f64, f64); outputs: (f64)),
-    (* f64_max             = 0xa5 *) (inputs: (f64, f64); outputs: (f64)),
-    (* f64_copysign        = 0xa6 *) (inputs: (f64, f64); outputs: (f64)),
+    (* f64_abs             = $99 *) (inputs: (f64, none); outputs: (f64)),
+    (* f64_neg             = $9a *) (inputs: (f64, none); outputs: (f64)),
+    (* f64_ceil            = $9b *) (inputs: (f64, none); outputs: (f64)),
+    (* f64_floor           = $9c *) (inputs: (f64, none); outputs: (f64)),
+    (* f64_trunc           = $9d *) (inputs: (f64, none); outputs: (f64)),
+    (* f64_nearest         = $9e *) (inputs: (f64, none); outputs: (f64)),
+    (* f64_sqrt            = $9f *) (inputs: (f64, none); outputs: (f64)),
+    (* f64_add             = $a0 *) (inputs: (f64, f64); outputs: (f64)),
+    (* f64_sub             = $a1 *) (inputs: (f64, f64); outputs: (f64)),
+    (* f64_mul             = $a2 *) (inputs: (f64, f64); outputs: (f64)),
+    (* f64_div             = $a3 *) (inputs: (f64, f64); outputs: (f64)),
+    (* f64_min             = $a4 *) (inputs: (f64, f64); outputs: (f64)),
+    (* f64_max             = $a5 *) (inputs: (f64, f64); outputs: (f64)),
+    (* f64_copysign        = $a6 *) (inputs: (f64, f64); outputs: (f64)),
 
-    (* i32_wrap_i64        = 0xa7 *) (inputs: (i64, none); outputs: (i32)),
-    (* i32_trunc_f32_s     = 0xa8 *) (inputs: (f32, none); outputs: (i32)),
-    (* i32_trunc_f32_u     = 0xa9 *) (inputs: (f32, none); outputs: (i32)),
-    (* i32_trunc_f64_s     = 0xaa *) (inputs: (f64, none); outputs: (i32)),
-    (* i32_trunc_f64_u     = 0xab *) (inputs: (f64, none); outputs: (i32)),
-    (* i64_extend_i32_s    = 0xac *) (inputs: (i32, none); outputs: (i64)),
-    (* i64_extend_i32_u    = 0xad *) (inputs: (i32, none); outputs: (i64)),
-    (* i64_trunc_f32_s     = 0xae *) (inputs: (f32, none); outputs: (i64)),
-    (* i64_trunc_f32_u     = 0xaf *) (inputs: (f32, none); outputs: (i64)),
-    (* i64_trunc_f64_s     = 0xb0 *) (inputs: (f64, none); outputs: (i64)),
-    (* i64_trunc_f64_u     = 0xb1 *) (inputs: (f64, none); outputs: (i64)),
-    (* f32_convert_i32_s   = 0xb2 *) (inputs: (i32, none); outputs: (f32)),
-    (* f32_convert_i32_u   = 0xb3 *) (inputs: (i32, none); outputs: (f32)),
-    (* f32_convert_i64_s   = 0xb4 *) (inputs: (i64, none); outputs: (f32)),
-    (* f32_convert_i64_u   = 0xb5 *) (inputs: (i64, none); outputs: (f32)),
-    (* f32_demote_f64      = 0xb6 *) (inputs: (f64, none); outputs: (f32)),
-    (* f64_convert_i32_s   = 0xb7 *) (inputs: (i32, none); outputs: (f64)),
-    (* f64_convert_i32_u   = 0xb8 *) (inputs: (i32, none); outputs: (f64)),
-    (* f64_convert_i64_s   = 0xb9 *) (inputs: (i64, none); outputs: (f64)),
-    (* f64_convert_i64_u   = 0xba *) (inputs: (i64, none); outputs: (f64)),
-    (* f64_promote_f32     = 0xbb *) (inputs: (f32, none); outputs: (f64)),
-    (* i32_reinterpret_f32 = 0xbc *) (inputs: (f32, none); outputs: (i32)),
-    (* i64_reinterpret_f64 = 0xbd *) (inputs: (f64, none); outputs: (i64)),
-    (* f32_reinterpret_i32 = 0xbe *) (inputs: (i32, none); outputs: (f32)),
-    (* f64_reinterpret_i64 = 0xbf *) (inputs: (i64, none); outputs: (f64)),
-    (), (), (), (), ()
-    );
+    (* i32_wrap_i64        = $a7 *) (inputs: (i64, none); outputs: (i32)),
+    (* i32_trunc_f32_s     = $a8 *) (inputs: (f32, none); outputs: (i32)),
+    (* i32_trunc_f32_u     = $a9 *) (inputs: (f32, none); outputs: (i32)),
+    (* i32_trunc_f64_s     = $aa *) (inputs: (f64, none); outputs: (i32)),
+    (* i32_trunc_f64_u     = $ab *) (inputs: (f64, none); outputs: (i32)),
+    (* i64_extend_i32_s    = $ac *) (inputs: (i32, none); outputs: (i64)),
+    (* i64_extend_i32_u    = $ad *) (inputs: (i32, none); outputs: (i64)),
+    (* i64_trunc_f32_s     = $ae *) (inputs: (f32, none); outputs: (i64)),
+    (* i64_trunc_f32_u     = $af *) (inputs: (f32, none); outputs: (i64)),
+    (* i64_trunc_f64_s     = $b0 *) (inputs: (f64, none); outputs: (i64)),
+    (* i64_trunc_f64_u     = $b1 *) (inputs: (f64, none); outputs: (i64)),
+    (* f32_convert_i32_s   = $b2 *) (inputs: (i32, none); outputs: (f32)),
+    (* f32_convert_i32_u   = $b3 *) (inputs: (i32, none); outputs: (f32)),
+    (* f32_convert_i64_s   = $b4 *) (inputs: (i64, none); outputs: (f32)),
+    (* f32_convert_i64_u   = $b5 *) (inputs: (i64, none); outputs: (f32)),
+    (* f32_demote_f64      = $b6 *) (inputs: (f64, none); outputs: (f32)),
+    (* f64_convert_i32_s   = $b7 *) (inputs: (i32, none); outputs: (f64)),
+    (* f64_convert_i32_u   = $b8 *) (inputs: (i32, none); outputs: (f64)),
+    (* f64_convert_i64_s   = $b9 *) (inputs: (i64, none); outputs: (f64)),
+    (* f64_convert_i64_u   = $ba *) (inputs: (i64, none); outputs: (f64)),
+    (* f64_promote_f32     = $bb *) (inputs: (f32, none); outputs: (f64)),
+    (* i32_reinterpret_f32 = $bc *) (inputs: (f32, none); outputs: (i32)),
+    (* i64_reinterpret_f64 = $bd *) (inputs: (f64, none); outputs: (i64)),
+    (* f32_reinterpret_i32 = $be *) (inputs: (i32, none); outputs: (f32)),
+    (* f64_reinterpret_i64 = $bf *) (inputs: (i64, none); outputs: (f64)),
+    (), (), (), (), ());
+
+{$EndRegion}
+
+{$Region ''}
+
+  InstructionMaxAlign: array [TInstruction] of Byte = (
+    // 5.4.1 Control instructions
+    (* unreachable         = $00 *) 0,
+    (* nop                 = $01 *) 0,
+    (* block               = $02 *) 0,
+    (* loop                = $03 *) 0,
+    (* if_                 = $04 *) 0,
+    (* else_               = $05 *) 0,
+    (*                       $06 *) 0,
+    (*                       $07 *) 0,
+    (*                       $08 *) 0,
+    (*                       $09 *) 0,
+    (*                       $0a *) 0,
+    (* end                 = $0b *) 0,
+    (* br                  = $0c *) 0,
+    (* br_if               = $0d *) 0,
+    (* br_table            = $0e *) 0,
+    (* return_             = $0f *) 0,
+    (* call                = $10 *) 0,
+    (* call_indirect       = $11 *) 0,
+
+    (*                       $12 *) 0,
+    (*                       $13 *) 0,
+    (*                       $14 *) 0,
+    (*                       $15 *) 0,
+    (*                       $16 *) 0,
+    (*                       $17 *) 0,
+    (*                       $18 *) 0,
+    (*                       $19 *) 0,
+
+    // 5.4.2 Parametric instructions
+    (* drop                = $1a *) 0,
+    (* select              = $1b *) 0,
+
+    (*                       $1c *) 0,
+    (*                       $1d *) 0,
+    (*                       $1e *) 0,
+    (*                       $1f *) 0,
+
+    // 5.4.3 Variable instructions
+    (* local_get           = $20 *) 0,
+    (* local_set           = $21 *) 0,
+    (* local_tee           = $22 *) 0,
+    (* global_get          = $23 *) 0,
+    (* global_set          = $24 *) 0,
+
+    (*                       $25 *) 0,
+    (*                       $26 *) 0,
+    (*                       $27 *) 0,
+
+    // 5.4.4 Memory instructions
+    (* i32_load            = $28 *) 2,
+    (* i64_load            = $29 *) 3,
+    (* f32_load            = $2a *) 2,
+    (* f64_load            = $2b *) 3,
+    (* i32_load8_s         = $2c *) 0,
+    (* i32_load8_u         = $2d *) 0,
+    (* i32_load16_s        = $2e *) 1,
+    (* i32_load16_u        = $2f *) 1,
+    (* i64_load8_s         = $30 *) 0,
+    (* i64_load8_u         = $31 *) 0,
+    (* i64_load16_s        = $32 *) 1,
+    (* i64_load16_u        = $33 *) 1,
+    (* i64_load32_s        = $34 *) 2,
+    (* i64_load32_u        = $35 *) 2,
+    (* i32_store           = $36 *) 2,
+    (* i64_store           = $37 *) 3,
+    (* f32_store           = $38 *) 2,
+    (* f64_store           = $39 *) 3,
+    (* i32_store8          = $3a *) 0,
+    (* i32_store16         = $3b *) 1,
+    (* i64_store8          = $3c *) 0,
+    (* i64_store16         = $3d *) 1,
+    (* i64_store32         = $3e *) 2,
+    (* memory_size         = $3f *) 0,
+    (* memory_grow         = $40 *) 0,
+
+    // 5.4.5 Numeric instructions
+    (* i32_const           = $41 *) 0,
+    (* i64_const           = $42 *) 0,
+    (* f32_const           = $43 *) 0,
+    (* f64_const           = $44 *) 0,
+
+    (* i32_eqz             = $45 *) 0,
+    (* i32_eq              = $46 *) 0,
+    (* i32_ne              = $47 *) 0,
+    (* i32_lt_s            = $48 *) 0,
+    (* i32_lt_u            = $49 *) 0,
+    (* i32_gt_s            = $4a *) 0,
+    (* i32_gt_u            = $4b *) 0,
+    (* i32_le_s            = $4c *) 0,
+    (* i32_le_u            = $4d *) 0,
+    (* i32_ge_s            = $4e *) 0,
+    (* i32_ge_u            = $4f *) 0,
+
+    (* i64_eqz             = $50 *) 0,
+    (* i64_eq              = $51 *) 0,
+    (* i64_ne              = $52 *) 0,
+    (* i64_lt_s            = $53 *) 0,
+    (* i64_lt_u            = $54 *) 0,
+    (* i64_gt_s            = $55 *) 0,
+    (* i64_gt_u            = $56 *) 0,
+    (* i64_le_s            = $57 *) 0,
+    (* i64_le_u            = $58 *) 0,
+    (* i64_ge_s            = $59 *) 0,
+    (* i64_ge_u            = $5a *) 0,
+
+    (* f32_eq              = $5b *) 0,
+    (* f32_ne              = $5c *) 0,
+    (* f32_lt              = $5d *) 0,
+    (* f32_gt              = $5e *) 0,
+    (* f32_le              = $5f *) 0,
+    (* f32_ge              = $60 *) 0,
+
+    (* f64_eq              = $61 *) 0,
+    (* f64_ne              = $62 *) 0,
+    (* f64_lt              = $63 *) 0,
+    (* f64_gt              = $64 *) 0,
+    (* f64_le              = $65 *) 0,
+    (* f64_ge              = $66 *) 0,
+
+    (* i32_clz             = $67 *) 0,
+    (* i32_ctz             = $68 *) 0,
+    (* i32_popcnt          = $69 *) 0,
+    (* i32_add             = $6a *) 0,
+    (* i32_sub             = $6b *) 0,
+    (* i32_mul             = $6c *) 0,
+    (* i32_div_s           = $6d *) 0,
+    (* i32_div_u           = $6e *) 0,
+    (* i32_rem_s           = $6f *) 0,
+    (* i32_rem_u           = $70 *) 0,
+    (* i32_and             = $71 *) 0,
+    (* i32_or              = $72 *) 0,
+    (* i32_xor             = $73 *) 0,
+    (* i32_shl             = $74 *) 0,
+    (* i32_shr_s           = $75 *) 0,
+    (* i32_shr_u           = $76 *) 0,
+    (* i32_rotl            = $77 *) 0,
+    (* i32_rotr            = $78 *) 0,
+
+    (* i64_clz             = $79 *) 0,
+    (* i64_ctz             = $7a *) 0,
+    (* i64_popcnt          = $7b *) 0,
+    (* i64_add             = $7c *) 0,
+    (* i64_sub             = $7d *) 0,
+    (* i64_mul             = $7e *) 0,
+    (* i64_div_s           = $7f *) 0,
+    (* i64_div_u           = $80 *) 0,
+    (* i64_rem_s           = $81 *) 0,
+    (* i64_rem_u           = $82 *) 0,
+    (* i64_and             = $83 *) 0,
+    (* i64_or              = $84 *) 0,
+    (* i64_xor             = $85 *) 0,
+    (* i64_shl             = $86 *) 0,
+    (* i64_shr_s           = $87 *) 0,
+    (* i64_shr_u           = $88 *) 0,
+    (* i64_rotl            = $89 *) 0,
+    (* i64_rotr            = $8a *) 0,
+
+    (* f32_abs             = $8b *) 0,
+    (* f32_neg             = $8c *) 0,
+    (* f32_ceil            = $8d *) 0,
+    (* f32_floor           = $8e *) 0,
+    (* f32_trunc           = $8f *) 0,
+    (* f32_nearest         = $90 *) 0,
+    (* f32_sqrt            = $91 *) 0,
+    (* f32_add             = $92 *) 0,
+    (* f32_sub             = $93 *) 0,
+    (* f32_mul             = $94 *) 0,
+    (* f32_div             = $95 *) 0,
+    (* f32_min             = $96 *) 0,
+    (* f32_max             = $97 *) 0,
+    (* f32_copysign        = $98 *) 0,
+
+    (* f64_abs             = $99 *) 0,
+    (* f64_neg             = $9a *) 0,
+    (* f64_ceil            = $9b *) 0,
+    (* f64_floor           = $9c *) 0,
+    (* f64_trunc           = $9d *) 0,
+    (* f64_nearest         = $9e *) 0,
+    (* f64_sqrt            = $9f *) 0,
+    (* f64_add             = $a0 *) 0,
+    (* f64_sub             = $a1 *) 0,
+    (* f64_mul             = $a2 *) 0,
+    (* f64_div             = $a3 *) 0,
+    (* f64_min             = $a4 *) 0,
+    (* f64_max             = $a5 *) 0,
+    (* f64_copysign        = $a6 *) 0,
+
+    (* i32_wrap_i64        = $a7 *) 0,
+    (* i32_trunc_f32_s     = $a8 *) 0,
+    (* i32_trunc_f32_u     = $a9 *) 0,
+    (* i32_trunc_f64_s     = $aa *) 0,
+    (* i32_trunc_f64_u     = $ab *) 0,
+    (* i64_extend_i32_s    = $ac *) 0,
+    (* i64_extend_i32_u    = $ad *) 0,
+    (* i64_trunc_f32_s     = $ae *) 0,
+    (* i64_trunc_f32_u     = $af *) 0,
+    (* i64_trunc_f64_s     = $b0 *) 0,
+    (* i64_trunc_f64_u     = $b1 *) 0,
+    (* f32_convert_i32_s   = $b2 *) 0,
+    (* f32_convert_i32_u   = $b3 *) 0,
+    (* f32_convert_i64_s   = $b4 *) 0,
+    (* f32_convert_i64_u   = $b5 *) 0,
+    (* f32_demote_f64      = $b6 *) 0,
+    (* f64_convert_i32_s   = $b7 *) 0,
+    (* f64_convert_i32_u   = $b8 *) 0,
+    (* f64_convert_i64_s   = $b9 *) 0,
+    (* f64_convert_i64_u   = $ba *) 0,
+    (* f64_promote_f32     = $bb *) 0,
+    (* i32_reinterpret_f32 = $bc *) 0,
+    (* i64_reinterpret_f64 = $bd *) 0,
+    (* f32_reinterpret_i32 = $be *) 0,
+    (* f64_reinterpret_i64 = $bf *) 0,
+    0, 0, 0, 0, 0);
+
+{$EndRegion}
+
+{$Region 'Table getters'}
+
+function get_instruction_type_table: PInstructionTypeTable;
+begin
+  Result := @InstructionTypes;
+end;
+
+function get_instruction_max_align_table: PInstructionMaxAlignTable;
+begin
+  Result := 0;
+end;
+
+{$EndRegion}
+
+{$Region 'Operations'}
 
 type
   U64 = record
@@ -476,18 +724,6 @@ type
       1: (i64: Uint64);
       2: (lo, hi: Uint32);
   end;
-
-function get_instruction_type_table: PInstructionType;
-begin
-  Result := @InstructionTypes;
-end;
-
-function get_instruction_max_align_table: Byte;
-begin
-  Result := 0;
-end;
-
-{$Region 'Operations'}
 
 function rotl(lhs, rhs: Uint32): Uint32;
 const
