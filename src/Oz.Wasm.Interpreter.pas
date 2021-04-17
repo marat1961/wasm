@@ -415,14 +415,14 @@ end;
 
 function TVm.CheckLoad<SrcT>: Boolean;
 var
-  address, offset: Int32;
+  address, offset: Uint32;
 begin
   address := stack.Top.AsInt32;
   // NOTE: alignment is dropped by the parser
   offset := pc.read<Uint32>;
   vi := Uint64(address) + offset;
   // Addressing is 32-bit, but we keep the value as 64-bit to detect overflows.
-  Result := vi + sizeof(SrcT) <= Length(memory);
+  Result := vi + sizeof(SrcT) <= Uint64(Length(memory));
 end;
 
 function TVm.LoadFromMemory<T>: T;
@@ -435,7 +435,7 @@ end;
 
 function TVm.CheckStore<DstT>: Boolean;
 var
-  address, offset: Int32;
+  address, offset: Uint32;
 begin
   address := stack.Pop.AsInt32;
   // NOTE: alignment is dropped by the parser

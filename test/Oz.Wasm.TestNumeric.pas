@@ -8,13 +8,13 @@ uses
 
 type
   TestNumeric = class(TTestCase)
-  public
-    procedure SetUp; override;
-    procedure TearDown; override;
   published
     procedure Test_i32_clz;
     procedure Test_i32_ctz;
     procedure Test_i32_popcnt;
+    procedure Test_i64_clz;
+    procedure Test_i64_ctz;
+    procedure Test_i64_popcnt;
   end;
 
 implementation
@@ -22,20 +22,6 @@ implementation
 type
   TUint32Pair = record v, r: Uint32; end;
   TUint64Pair = record v, r: Uint64; end;
-
-{ TestNumeric }
-
-procedure TestNumeric.SetUp;
-begin
-  inherited;
-
-end;
-
-procedure TestNumeric.TearDown;
-begin
-  inherited;
-
-end;
 
 procedure TestNumeric.Test_i32_clz;
 const
@@ -84,7 +70,50 @@ const
     (v: $00ff00ff; r: 16),
     (v: $007f8001; r: 9),
     (v: $0055ffaa; r: 16));
-  Popcount64TestCases: array [0..11] of TUint64Pair = (
+begin
+  for var i := 0 to High(Tests) do
+  begin
+    var test := Tests[i];
+    var r := popcount32(test.v);
+    Check(r = test.r);
+  end;
+end;
+
+procedure TestNumeric.Test_i64_clz;
+const
+  Tests: array [0..3] of TUint64Pair = (
+    (v: 0; r: 64),
+    (v: 1; r: 0),
+    (v: 4; r: 2),
+    (v: $80; r: 7));
+begin
+  for var i := 0 to High(Tests) do
+  begin
+    var test := Tests[i];
+    var r := clz64(test.v);
+    Check(r = test.r);
+  end;
+end;
+
+procedure TestNumeric.Test_i64_ctz;
+const
+  Tests: array [0..3] of TUint64Pair = (
+    (v: 0; r: 64),
+    (v: 1; r: 0),
+    (v: 4; r: 64 - 2),
+    (v: $7f; r: 64 - 7));
+begin
+  for var i := 0 to High(Tests) do
+  begin
+    var test := Tests[i];
+    var r := ctz64(test.v);
+    Check(r = test.r);
+  end;
+end;
+
+procedure TestNumeric.Test_i64_popcnt;
+const
+  Tests: array [0..11] of TUint64Pair = (
     (v: 0; r: 0),
     (v: 1; r: 1),
     (v: $7f; r: 7),
@@ -101,7 +130,7 @@ begin
   for var i := 0 to High(Tests) do
   begin
     var test := Tests[i];
-    var r := popcount32(test.v);
+    var r := popcount64(test.v);
     Check(r = test.r);
   end;
 end;

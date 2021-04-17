@@ -270,13 +270,29 @@ asm
 end;
 
 function __builtin_clzll(x: Uint64): Uint64;
-begin
-
+asm
+{$IF Defined(CPUX64)}
+  BSR     RCX,RCX
+  NEG     RCX
+  ADD     RCX,63
+  MOV     RAX,RCX
+{$ENDIF}
+{$IF Defined(CPUX86)}
+  BSR     EAX,EAX
+  NEG     EAX
+  ADD     EAX,63
+{$ENDIF}
 end;
 
 function __builtin_ctzll(x: Uint64): Uint64;
-begin
-
+asm
+{$IF Defined(CPUX64)}
+  BSF     RCX,RCX
+  MOV     RAX,RCX
+{$ENDIF}
+{$IF Defined(CPUX86)}
+  BSF     EAX,EAX
+{$ENDIF}
 end;
 
 function clz32(value: Uint32): Uint32;
@@ -296,8 +312,8 @@ begin
 end;
 
 function popcount32(value: Uint32): Uint32;
-begin
-
+asm
+  POPCNT EAX,EAX
 end;
 
 function clz64(value: Uint64): Uint64;
@@ -317,8 +333,14 @@ begin
 end;
 
 function popcount64(value: Uint64): Uint64;
-begin
-
+asm
+{$IF Defined(CPUX64)}
+  POPCNT  RCX,RCX
+  MOV     RAX,RCX
+{$ENDIF}
+{$IF Defined(CPUX86)}
+  POPCNT  EAX,value
+{$ENDIF}
 end;
 
 {$EndRegion}
