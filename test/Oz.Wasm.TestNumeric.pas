@@ -100,11 +100,14 @@ end;
 
 procedure TestNumeric.Test_i64_ctz;
 const
-  Tests: array [0..3] of TUint64Pair = (
+  Tests: array [0..6] of TUint64Pair = (
     (v: 0; r: 64),
     (v: 1; r: 0),
-    (v: 4; r: 64 - 2),
-    (v: $7f; r: 64 - 7));
+    (v: 4; r: 2),
+    (v: $80; r: 7),
+    (v: $000f0000; r: 16),
+    (v: $0800000000000000; r: 59),
+    (v: $8000000000000000; r: 63));
 begin
   for var i := 0 to High(Tests) do
   begin

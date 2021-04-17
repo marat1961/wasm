@@ -326,7 +326,7 @@ end;
 function clz64(value: Uint64): Uint64;
 begin
   if value = 0 then
-   Result := 64
+    Result := 64
   else if U64(value).hi <> 0 then
     Result := clz32(U64(value).hi)
   else
@@ -337,8 +337,10 @@ function ctz64(value: Uint64): Uint64;
 begin
   if value = 0 then
     Result := 64
+  else if U64(value).lo <> 0 then
+    Result := ctz32(U64(value).lo)
   else
-    Result := __builtin_ctzll(value);
+    Result := ctz32(U64(value).hi) + 32
 end;
 
 {$IF Defined(CPUX64)}
