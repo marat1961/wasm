@@ -187,12 +187,12 @@ type
 {$Region 'TVm'}
 
   TVm = record
-  const
+  strict private const
     F32AbsMask: Uint32 = $7fffffff;
     F32SignMask: Uint32 = Uint32(not $7fffffff);
     F64AbsMask: Uint64 = $fffffffffffffff;
     F64SignMask: Uint64 = Uint64(not $fffffffffffffff);
-  type
+  strict private type
     Tv32 = record
       case Integer of
         1: (i32: Uint32);

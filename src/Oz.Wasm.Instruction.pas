@@ -208,6 +208,29 @@ type
 
 {$EndRegion}
 
+  // Wasm 1.0 spec only has instructions which take at most 2 items
+  // and return at most 1 item.
+  TValType = (
+    none = 0,
+    i32 = $7f,
+    i64 = $7e,
+    f32 = $7d,
+    f64 = $7c);
+
+  PInstructionType = ^TInstructionType;
+  TInstructionType = record
+    inputs: array [0..1] of TValType;
+    outputs: TValType;
+  end;
+
+function get_instruction_type_table: PInstructionType;
+
+// Returns the table of max alignment values for each instruction - the largest acceptable
+// alignment value satisfying `2 ** max_align < memory_width` where memory_width is the number of
+// bytes the instruction operates on.
+// It may contain invalid value for instructions not needing it.
+function get_instruction_max_align_table: Byte;
+
 {$Region 'Operations'}
 
 function rotl(lhs, rhs: Uint32): Uint32; inline;
@@ -223,12 +246,246 @@ function popcount64(value: Uint64): Uint64;
 
 implementation
 
+const
+  // Order of input parameters is the order they are popped from stack,
+  // which is consistent with the order in FuncType::inputs.
+  InstructionTypes: array [TInstruction] of TInstructionType = (
+
+    // 5.4.1 Control instructions
+    (* unreachable         = 0x00 *) (),
+    (* nop                 = 0x01 *) (),
+    (* block               = 0x02 *) (),
+    (* loop                = 0x03 *) (),
+    (* if_                 = 0x04 *) (inputs: (TValType.i32, none)),
+    (* else_               = 0x05 *) (),
+    (*                       0x06 *) (),
+    (*                       0x07 *) (),
+    (*                       0x08 *) (),
+    (*                       0x09 *) (),
+    (*                       0x0a *) (),
+    (* end                 = 0x0b *) (),
+    (* br                  = 0x0c *) (),
+    (* br_if               = 0x0d *) (inputs: (TValType.i32, none)),
+    (* br_table            = 0x0e *) (inputs: (TValType.i32, none)),
+    (* return_             = 0x0f *) (),
+
+    (* call                = 0x10 *) (),
+    (* call_indirect       = 0x11 *) (inputs: (TValType.i32, none)),
+
+    (*                       0x12 *) (),
+    (*                       0x13 *) (),
+    (*                       0x14 *) (),
+    (*                       0x15 *) (),
+    (*                       0x16 *) (),
+    (*                       0x17 *) (),
+    (*                       0x18 *) (),
+    (*                       0x19 *) (),
+
+    // 5.4.2 Parametric instructions
+    // Stack polymorphic instructions - validated at instruction handler in expression parser.
+    (* drop                = 0x1a *) (),
+    (* select              = 0x1b *) (inputs: (TValType.i32, none)),
+
+    (*                       0x1c *) (),
+    (*                       0x1d *) (),
+    (*                       0x1e *) (),
+    (*                       0x1f *) (),
+
+    // 5.4.3 Variable instructions
+    // Stack polymorphic instructions - validated at instruction handler in expression parser.
+    (* local_get           = 0x20 *) (),
+    (* local_set           = 0x21 *) (),
+    (* local_tee           = 0x22 *) (),
+    (* global_get          = 0x23 *) (),
+    (* global_set          = 0x24 *) (),
+
+    (*                       0x25 *) (),
+    (*                       0x26 *) (),
+    (*                       0x27 *) (),
+
+    // 5.4.4 Memory instructions
+    (* i32_load            = 0x28 *) (inputs: (TValType.i32, none); outputs: (TValType.i32)),
+    (* i64_load            = 0x29 *) (inputs: (TValType.i32, none); outputs: (TValType.i64)),
+    (* f32_load            = 0x2a *) (inputs: (TValType.i32, none); outputs: (TValType.f32)),
+    (* f64_load            = 0x2b *) (inputs: (TValType.i32, none); outputs: (TValType.f64)),
+    (* i32_load8_s         = 0x2c *) (inputs: (TValType.i32, none); outputs: (TValType.i32)),
+    (* i32_load8_u         = 0x2d *) (inputs: (TValType.i32, none); outputs: (TValType.i32)),
+    (* i32_load16_s        = 0x2e *) (inputs: (TValType.i32, none); outputs: (TValType.i32)),
+    (* i32_load16_u        = 0x2f *) (inputs: (TValType.i32, none); outputs: (TValType.i32)),
+    (* i64_load8_s         = 0x30 *) (inputs: (TValType.i32, none); outputs: (TValType.i64)),
+    (* i64_load8_u         = 0x31 *) (inputs: (TValType.i32, none); outputs: (TValType.i64)),
+    (* i64_load16_s        = 0x32 *) (inputs: (TValType.i32, none); outputs: (TValType.i64)),
+    (* i64_load16_u        = 0x33 *) (inputs: (TValType.i32, none); outputs: (TValType.i64)),
+    (* i64_load32_s        = 0x34 *) (inputs: (TValType.i32, none); outputs: (TValType.i64)),
+    (* i64_load32_u        = 0x35 *) (inputs: (TValType.i32, none); outputs: (TValType.i64)),
+    (* i32_store           = 0x36 *) (inputs: (TValType.i32, TValType.i32)),
+    (* i64_store           = 0x37 *) (inputs: (TValType.i32, TValType.i64)),
+    (* f32_store           = 0x38 *) (inputs: (TValType.i32, TValType.f32)),
+    (* f64_store           = 0x39 *) (inputs: (TValType.i32, TValType.f64)),
+    (* i32_store8          = 0x3a *) (inputs: (TValType.i32, TValType.i32)),
+    (* i32_store16         = 0x3b *) (inputs: (TValType.i32, TValType.i32)),
+    (* i64_store8          = 0x3c *) (inputs: (TValType.i32, TValType.i64)),
+    (* i64_store16         = 0x3d *) (inputs: (TValType.i32, TValType.i64)),
+    (* i64_store32         = 0x3e *) (inputs: (TValType.i32, TValType.i64)),
+    (* memory_size         = 0x3f *) (outputs: (TValType.i32)),
+    (* memory_grow         = 0x40 *) (inputs: (TValType.i32, none); outputs: (TValType.i32)),
+
+    // 5.4.5 Numeric instructions
+    (* i32_const           = 0x41 *) (outputs: (TValType.i32)),
+    (* i64_const           = 0x42 *) (outputs: (TValType.i64)),
+    (* f32_const           = 0x43 *) (outputs: (TValType.f32)),
+    (* f64_const           = 0x44 *) (outputs: (TValType.f64)),
+
+    (* i32_eqz             = 0x45 *) (inputs: (TValType.i32, none); outputs: (TValType.i32)),
+    (* i32_eq              = 0x46 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_ne              = 0x47 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_lt_s            = 0x48 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_lt_u            = 0x49 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_gt_s            = 0x4a *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_gt_u            = 0x4b *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_le_s            = 0x4c *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_le_u            = 0x4d *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_ge_s            = 0x4e *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_ge_u            = 0x4f *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+
+    (* i64_eqz             = 0x50 *) (inputs: (TValType.i64, none); outputs: (TValType.i32)),
+    (* i64_eq              = 0x51 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i32)),
+    (* i64_ne              = 0x52 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i32)),
+    (* i64_lt_s            = 0x53 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i32)),
+    (* i64_lt_u            = 0x54 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i32)),
+    (* i64_gt_s            = 0x55 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i32)),
+    (* i64_gt_u            = 0x56 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i32)),
+    (* i64_le_s            = 0x57 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i32)),
+    (* i64_le_u            = 0x58 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i32)),
+    (* i64_ge_s            = 0x59 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i32)),
+    (* i64_ge_u            = 0x5a *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i32)),
+
+    (* f32_eq              = 0x5b *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.i32)),
+    (* f32_ne              = 0x5c *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.i32)),
+    (* f32_lt              = 0x5d *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.i32)),
+    (* f32_gt              = 0x5e *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.i32)),
+    (* f32_le              = 0x5f *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.i32)),
+    (* f32_ge              = 0x60 *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.i32)),
+
+    (* f64_eq              = 0x61 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.i32)),
+    (* f64_ne              = 0x62 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.i32)),
+    (* f64_lt              = 0x63 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.i32)),
+    (* f64_gt              = 0x64 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.i32)),
+    (* f64_le              = 0x65 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.i32)),
+    (* f64_ge              = 0x66 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.i32)),
+
+    (* i32_clz             = 0x67 *) (inputs: (TValType.i32, none); outputs: (TValType.i32)),
+    (* i32_ctz             = 0x68 *) (inputs: (TValType.i32, none); outputs: (TValType.i32)),
+    (* i32_popcnt          = 0x69 *) (inputs: (TValType.i32, none); outputs: (TValType.i32)),
+    (* i32_add             = 0x6a *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_sub             = 0x6b *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_mul             = 0x6c *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_div_s           = 0x6d *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_div_u           = 0x6e *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_rem_s           = 0x6f *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_rem_u           = 0x70 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_and             = 0x71 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_or              = 0x72 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_xor             = 0x73 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_shl             = 0x74 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_shr_s           = 0x75 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_shr_u           = 0x76 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_rotl            = 0x77 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+    (* i32_rotr            = 0x78 *) (inputs: (TValType.i32, TValType.i32); outputs: (TValType.i32)),
+
+    (* i64_clz             = 0x79 *) (inputs: (TValType.i64, none); outputs: (TValType.i64)),
+    (* i64_ctz             = 0x7a *) (inputs: (TValType.i64, none); outputs: (TValType.i64)),
+    (* i64_popcnt          = 0x7b *) (inputs: (TValType.i64, none); outputs: (TValType.i64)),
+    (* i64_add             = 0x7c *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_sub             = 0x7d *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_mul             = 0x7e *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_div_s           = 0x7f *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_div_u           = 0x80 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_rem_s           = 0x81 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_rem_u           = 0x82 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_and             = 0x83 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_or              = 0x84 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_xor             = 0x85 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_shl             = 0x86 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_shr_s           = 0x87 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_shr_u           = 0x88 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_rotl            = 0x89 *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+    (* i64_rotr            = 0x8a *) (inputs: (TValType.i64, TValType.i64); outputs: (TValType.i64)),
+
+    (* f32_abs             = 0x8b *) (inputs: (TValType.f32, none); outputs: (TValType.f32)),
+    (* f32_neg             = 0x8c *) (inputs: (TValType.f32, none); outputs: (TValType.f32)),
+    (* f32_ceil            = 0x8d *) (inputs: (TValType.f32, none); outputs: (TValType.f32)),
+    (* f32_floor           = 0x8e *) (inputs: (TValType.f32, none); outputs: (TValType.f32)),
+    (* f32_trunc           = 0x8f *) (inputs: (TValType.f32, none); outputs: (TValType.f32)),
+    (* f32_nearest         = 0x90 *) (inputs: (TValType.f32, none); outputs: (TValType.f32)),
+    (* f32_sqrt            = 0x91 *) (inputs: (TValType.f32, none); outputs: (TValType.f32)),
+    (* f32_add             = 0x92 *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.f32)),
+    (* f32_sub             = 0x93 *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.f32)),
+    (* f32_mul             = 0x94 *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.f32)),
+    (* f32_div             = 0x95 *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.f32)),
+    (* f32_min             = 0x96 *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.f32)),
+    (* f32_max             = 0x97 *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.f32)),
+    (* f32_copysign        = 0x98 *) (inputs: (TValType.f32, TValType.f32); outputs: (TValType.f32)),
+
+    (* f64_abs             = 0x99 *) (inputs: (TValType.f64, none); outputs: (TValType.f64)),
+    (* f64_neg             = 0x9a *) (inputs: (TValType.f64, none); outputs: (TValType.f64)),
+    (* f64_ceil            = 0x9b *) (inputs: (TValType.f64, none); outputs: (TValType.f64)),
+    (* f64_floor           = 0x9c *) (inputs: (TValType.f64, none); outputs: (TValType.f64)),
+    (* f64_trunc           = 0x9d *) (inputs: (TValType.f64, none); outputs: (TValType.f64)),
+    (* f64_nearest         = 0x9e *) (inputs: (TValType.f64, none); outputs: (TValType.f64)),
+    (* f64_sqrt            = 0x9f *) (inputs: (TValType.f64, none); outputs: (TValType.f64)),
+    (* f64_add             = 0xa0 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.f64)),
+    (* f64_sub             = 0xa1 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.f64)),
+    (* f64_mul             = 0xa2 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.f64)),
+    (* f64_div             = 0xa3 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.f64)),
+    (* f64_min             = 0xa4 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.f64)),
+    (* f64_max             = 0xa5 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.f64)),
+    (* f64_copysign        = 0xa6 *) (inputs: (TValType.f64, TValType.f64); outputs: (TValType.f64)),
+
+    (* i32_wrap_i64        = 0xa7 *) (inputs: (TValType.i64, none); outputs: (TValType.i32)),
+    (* i32_trunc_f32_s     = 0xa8 *) (inputs: (TValType.f32, none); outputs: (TValType.i32)),
+    (* i32_trunc_f32_u     = 0xa9 *) (inputs: (TValType.f32, none); outputs: (TValType.i32)),
+    (* i32_trunc_f64_s     = 0xaa *) (inputs: (TValType.f64, none); outputs: (TValType.i32)),
+    (* i32_trunc_f64_u     = 0xab *) (inputs: (TValType.f64, none); outputs: (TValType.i32)),
+    (* i64_extend_i32_s    = 0xac *) (inputs: (TValType.i32, none); outputs: (TValType.i64)),
+    (* i64_extend_i32_u    = 0xad *) (inputs: (TValType.i32, none); outputs: (TValType.i64)),
+    (* i64_trunc_f32_s     = 0xae *) (inputs: (TValType.f32, none); outputs: (TValType.i64)),
+    (* i64_trunc_f32_u     = 0xaf *) (inputs: (TValType.f32, none); outputs: (TValType.i64)),
+    (* i64_trunc_f64_s     = 0xb0 *) (inputs: (TValType.f64, none); outputs: (TValType.i64)),
+    (* i64_trunc_f64_u     = 0xb1 *) (inputs: (TValType.f64, none); outputs: (TValType.i64)),
+    (* f32_convert_i32_s   = 0xb2 *) (inputs: (TValType.i32, none); outputs: (TValType.f32)),
+    (* f32_convert_i32_u   = 0xb3 *) (inputs: (TValType.i32, none); outputs: (TValType.f32)),
+    (* f32_convert_i64_s   = 0xb4 *) (inputs: (TValType.i64, none); outputs: (TValType.f32)),
+    (* f32_convert_i64_u   = 0xb5 *) (inputs: (TValType.i64, none); outputs: (TValType.f32)),
+    (* f32_demote_f64      = 0xb6 *) (inputs: (TValType.f64, none); outputs: (TValType.f32)),
+    (* f64_convert_i32_s   = 0xb7 *) (inputs: (TValType.i32, none); outputs: (TValType.f64)),
+    (* f64_convert_i32_u   = 0xb8 *) (inputs: (TValType.i32, none); outputs: (TValType.f64)),
+    (* f64_convert_i64_s   = 0xb9 *) (inputs: (TValType.i64, none); outputs: (TValType.f64)),
+    (* f64_convert_i64_u   = 0xba *) (inputs: (TValType.i64, none); outputs: (TValType.f64)),
+    (* f64_promote_f32     = 0xbb *) (inputs: (TValType.f32, none); outputs: (TValType.f64)),
+    (* i32_reinterpret_f32 = 0xbc *) (inputs: (TValType.f32, none); outputs: (TValType.i32)),
+    (* i64_reinterpret_f64 = 0xbd *) (inputs: (TValType.f64, none); outputs: (TValType.i64)),
+    (* f32_reinterpret_i32 = 0xbe *) (inputs: (TValType.i32, none); outputs: (TValType.f32)),
+    (* f64_reinterpret_i64 = 0xbf *) (inputs: (TValType.i64, none); outputs: (TValType.f64)),
+    (), (), (), (), ()
+    );
+
 type
   U64 = record
     case Integer of
       1: (i64: Uint64);
       2: (lo, hi: Uint32);
   end;
+
+function get_instruction_type_table: PInstructionType;
+begin
+  Result := @InstructionTypes;
+end;
+
+function get_instruction_max_align_table: Byte;
+begin
+  Result := 0;
+end;
 
 {$Region 'Operations'}
 
