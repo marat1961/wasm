@@ -81,11 +81,14 @@ end;
 
 procedure TestNumeric.Test_i64_clz;
 const
-  Tests: array [0..3] of TUint64Pair = (
+  Tests: array [0..6] of TUint64Pair = (
     (v: 0; r: 64),
-    (v: 1; r: 0),
-    (v: 4; r: 2),
-    (v: $80; r: 7));
+    (v: 1; r: 64 - 1),
+    (v: 4; r: 64 - 3),
+    (v: $7f; r: 64 - 7),
+    (v: $0000ffff; r: 64 - 16),
+    (v: $0f00000000000000; r: 64 - 60),
+    (v: $f000000000000000; r: 64 - 64));
 begin
   for var i := 0 to High(Tests) do
   begin

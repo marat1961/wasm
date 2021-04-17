@@ -223,6 +223,13 @@ function popcount64(value: Uint64): Uint64;
 
 implementation
 
+type
+  U64 = record
+    case Integer of
+      1: (i64: Uint64);
+      2: (lo, hi: Uint32);
+  end;
+
 {$Region 'Operations'}
 
 function rotl(lhs, rhs: Uint32): Uint32;
@@ -319,9 +326,11 @@ end;
 function clz64(value: Uint64): Uint64;
 begin
   if value = 0 then
-    Result := 64
+   Result := 64
+  else if U64(value).hi <> 0 then
+    Result := clz32(U64(value).hi)
   else
-    Result := __builtin_clzll(value);
+    Result := clz32(U64(value).lo) + 32
 end;
 
 function ctz64(value: Uint64): Uint64;
@@ -332,16 +341,20 @@ begin
     Result := __builtin_ctzll(value);
 end;
 
+{$IF Defined(CPUX64)}
 function popcount64(value: Uint64): Uint64;
 asm
-{$IF Defined(CPUX64)}
   POPCNT  RCX,RCX
   MOV     RAX,RCX
-{$ENDIF}
-{$IF Defined(CPUX86)}
-  POPCNT  EAX,value
-{$ENDIF}
 end;
+{$ENDIF}
+
+{$IF Defined(CPUX86)}
+function popcount64(value: Uint64): Uint64;
+begin
+  Result := popcount32(U64(value).hi) + popcount32(U64(value).lo);
+end;
+{$ENDIF}
 
 {$EndRegion}
 
