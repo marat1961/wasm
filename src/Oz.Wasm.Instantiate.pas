@@ -128,6 +128,7 @@ type
 
 {$Region 'TExternalFunction: imported and exported functions'}
 
+  PExternalFunction = ^TExternalFunction;
   TExternalFunction = record
   var
     func: TExecuteFunction;
@@ -210,7 +211,7 @@ function Instantiate(
   const importedTables: TArray<TExternalTable> = nil;
   const importedMemories: TArray<TExternalMemory> = nil;
   const importedGlobals: TArray<TExternalGlobal> = nil;
-  const memoryPagesLimit: Uint32 = DefaultMemoryPagesLimit): PInstance;
+  memoryPagesLimit: Uint32 = DefaultMemoryPagesLimit): PInstance;
 
 implementation
 
@@ -254,13 +255,75 @@ function evalConstantExpression(expr: TConstantExpression;
 begin
 end;
 
+procedure allocateTable(const module_tables: TArray<TTable>;
+  const imported_tables: TArray<TExternalTable>;
+  var table: PTable; var limits: TLimits);
+begin
+  Assert(Length(module_tables) + Length(imported_tables) <= 1);
+  if Length(module_tables) = 1 then
+  begin
+    limits := module_tables[0].limits;
+    table := System.AllocMem(limits.min * sizeof(TTableElement));
+  end
+  else if Length(imported_tables) = 1 then
+  begin
+    limits := imported_tables[0].limits;
+    table := @imported_tables[0].table;
+  end
+  else
+  begin
+    limits := Default(TLimits);
+    table := nil;
+  end
+end;
+
+procedure allocateMemory(const moduleMemories: TArray<TMemory>;
+  const importedMemories: TArray<TExternalMemory>; memoryPagesLimit: Uint32;
+  var memory: TBytes; var limits: TLimits);
+const
+  Err1 = 'hard memory limit cannot exceed %d bytes';
+  Err2 = 'cannot exceed hard memory limit of %d bytes';
+  Err3 = 'imported memory limits cannot exceed hard memory limit of %d bytes';
+var
+  lim: PLimits;
+begin
+  if memoryPagesLimit > MaxMemoryPagesLimit then
+    raise WasmError.CreateFmt(Err1, [Uint64(MaxMemoryPagesLimit) * PageSize]);
+  Assert(Length(moduleMemories) + Length(importedMemories) <= 1);
+  if Length(moduleMemories) = 1 then
+  begin
+    lim := @moduleMemories[0].limits;
+    if (lim.min > memoryPagesLimit) or
+       (lim.max.hasValue and (lim.max.value > memoryPagesLimit)) then
+      raise WasmError.CreateFmt(Err2, [memoryPagesLimit * PageSize]);
+
+    SetLength(memory, lim.min * PageSize);
+    limits := moduleMemories[0].limits;
+  end
+  else if Length(importedMemories) = 1 then
+  begin
+    lim := @importedMemories[0].limits;
+    if (lim.min > memoryPagesLimit) or
+       (lim.max.hasValue and (lim.max.value > memoryPagesLimit)) then
+      raise WasmError.CreateFmt(Err3, [memoryPagesLimit * PageSize]);
+
+    memory := importedMemories[0].data;
+    limits := importedMemories[0].limits;
+  end
+  else
+  begin
+    memory := nil;
+    limits := Default(TLimits);
+  end;
+end;
+
 function Instantiate(
   const module: TModule;
   const importedFunctions: TArray<TExternalFunction>;
   const importedTables: TArray<TExternalTable>;
   const importedMemories: TArray<TExternalMemory>;
   const importedGlobals: TArray<TExternalGlobal>;
-  const memoryPagesLimit: Uint32): PInstance;
+  memoryPagesLimit: Uint32): PInstance;
 begin
   Assert(Length(module.funcsec) = Length(module.codesec));
 
@@ -279,6 +342,23 @@ begin
       (global.expression.globalIndex < Length(importedGlobals)));
     var value := evalConstantExpression(global.expression, importedGlobals, globals);
     globals := globals + [value];
+  end;
+
+  var table: PTable;
+  var tableLimits: TLimits;
+  allocateTable(module.tablesec, importedTables, table, tableLimits);
+
+  var memory: TBytes;
+  var memoryLimits: TLimits;
+  allocateMemory(module.memorysec, importedMemories, memoryPagesLimit, memory, memoryLimits);
+
+  // In case upper limit for local/imported memory is defined,
+  // we adjust the hard memory limit, to ensure memory.grow will fail when exceeding it.
+  // Note: allocate_memory ensures memory's max limit is always below memory_pages_limit.
+  if memoryLimits.max.hasValue then
+  begin
+    Assert(memoryLimits.max.value <= memoryPagesLimit);
+    memoryPagesLimit := memoryLimits.max.value;
   end;
 
   var instance := nil;

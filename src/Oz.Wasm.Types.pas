@@ -50,6 +50,7 @@ type
   // Limits classify the size range of resizeable storage
   // associated with memory types and table types.
   // If no maximum is given, the respective storage can grow to any size.
+  PLimits = ^TLimits;
   TLimits = record
     min: Uint32;
     max: TOptional<Uint32>;
