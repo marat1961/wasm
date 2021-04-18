@@ -24,6 +24,16 @@ type
 
 {$EndRegion}
 
+{$Region 'TOptional<T>: '}
+
+  TOptional<T> = record
+    value: T;
+    hasValue: Boolean;
+    constructor From(value: T);
+  end;
+
+{$EndRegion}
+
 {$Region 'TSpan: a contiguous sequence of objects'}
 
   // The span describes an object that can refer to a contiguous sequence
@@ -140,6 +150,16 @@ begin
     Inc(PByte(p), sizeof(T));
     Dec(Count);
   end;
+end;
+
+{$EndRegion}
+
+{$Region 'TOptional<T>'}
+
+constructor TOptional<T>.From(value: T);
+begin
+  Self.value := value;
+  hasValue := True;
 end;
 
 {$EndRegion}

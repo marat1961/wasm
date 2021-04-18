@@ -7,17 +7,12 @@ unit Oz.Wasm.Module;
 interface
 
 uses
-  Oz.Wasm.Types;
+  Oz.Wasm.Utils, Oz.Wasm.Types;
 
 {$T+}
 {$SCOPEDENUMS ON}
 
 type
-
-  TOptional<T> = record
-    value: T;
-    define: Boolean;
-  end;
 
   TModule = record
   var

@@ -52,7 +52,7 @@ type
   // If no maximum is given, the respective storage can grow to any size.
   TLimits = record
     min: Uint32;
-    max: Uint32;
+    max: TOptional<Uint32>;
   end;
 
   // All indices are encoded with their respective value.
