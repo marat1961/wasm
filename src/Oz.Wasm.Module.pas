@@ -34,7 +34,7 @@ type
     codesec: TArray<TCode>;
     datasec: TArray<TData>;
     // Types of functions defined in import section
-    importedFunctionTypes: TArray<TFuncType> ;
+    importedFunctionTypes: TArray<TFuncType>;
     // Types of tables defined in import section
     importedTableTypes: TArray<TTable>;
     // Types of memories defined in import section

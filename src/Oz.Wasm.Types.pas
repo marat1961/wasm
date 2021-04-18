@@ -7,7 +7,7 @@ unit Oz.Wasm.Types;
 interface
 
 uses
-  System.Classes, System.SysUtils, Oz.Wasm.Value;
+  System.Classes, System.SysUtils, Oz.Wasm.Utils, Oz.Wasm.Value;
 
 {$T+}
 {$SCOPEDENUMS ON}
@@ -42,7 +42,9 @@ type
     inputs: TArray<TValType>;
     outputs: TArray<TValType>;
     constructor From(const ityp: TInstructionType);
-    function Equals(const ft: TFuncType): Boolean;
+    function Equals(const sinputs, soutputs: TSpan<TValType>): Boolean; overload;
+    function Equals(const ft: TFuncType): Boolean; overload;
+    class function EqualTypes(const a: TArray<TValType>; b: TSpan<TValType>): Boolean; static;
   end;
 
   // Limits classify the size range of resizeable storage
@@ -200,14 +202,42 @@ end;
 
 {$Region 'TFuncType'}
 
-function TFuncType.Equals(const ft: TFuncType): Boolean;
-begin
-  Result := (inputs = ft.inputs) and (outputs = ft.outputs);
-end;
-
 constructor TFuncType.From(const ityp: TInstructionType);
 begin
+  var n := ityp.inputsSize;
+  SetLength(inputs, n);
+  for var i := 0 to ityp.inputsSize - 1 do
+    inputs[i] := ityp.inputs[i];
+  if ityp.outputs <> TValType.none then
+    outputs[0] := ityp.outputs;
+end;
 
+function TFuncType.Equals(const ft: TFuncType): Boolean;
+begin
+  Result := (High(inputs) = High(ft.inputs)) and (High(outputs) = High(ft.outputs));
+  if Result then
+  begin
+    for var i := 0 to High(inputs) do
+      if inputs[i] <> ft.inputs[i] then
+        exit(False);
+    for var i := 0 to High(outputs) do
+      if outputs[i] <> ft.outputs[i] then
+        exit(False);
+  end;
+end;
+
+function TFuncType.Equals(const sinputs, soutputs: TSpan<TValType>): Boolean;
+begin
+  Result := EqualTypes(inputs, sinputs) and EqualTypes(outputs, soutputs);
+end;
+
+class function TFuncType.EqualTypes(const a: TArray<TValType>; b: TSpan<TValType>): Boolean;
+begin
+  Result := Length(a) = b.Size;
+  if Result then
+    for var i := 0 to High(a) do
+      if a[i] <> b.Items[i] then
+        exit(False);
 end;
 
 {$EndRegion}

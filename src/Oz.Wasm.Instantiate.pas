@@ -15,6 +15,8 @@ uses
 
 type
 
+  WasmError = class(Exception);
+
 {$Region 'TExecutionResult: The result of an execution'}
 
   TExecutionResult = record
@@ -210,11 +212,47 @@ function Instantiate(
   const importedGlobals: TArray<TExternalGlobal> = nil;
   const memoryPagesLimit: Uint32 = DefaultMemoryPagesLimit): PInstance;
 
-
 implementation
 
 uses
   Oz.Wasm.Interpreter;
+
+procedure matchImportedFunctions(const moduleFuncType: TArray<TFuncType>;
+  const importedFunc: TArray<TExternalFunction>);
+const
+  Err1 = 'module requires %d imported functions, %d provided';
+  Err2 = 'function %d type doesn''t match module''s imported function type';
+begin
+  if Length(moduleFuncType) <> Length(importedFunc) then
+    raise WasmError.CreateFmt(Err1, [Length(moduleFuncType), Length(importedFunc)]);
+  for var i := 0 to High(importedFunc) do
+  begin
+    var f := @importedFunc[i];
+    if not moduleFuncType[i].equals(f.inputTypes, f.outputTypes) then
+     raise WasmError.CreateFmt(Err2,[i]);
+  end;
+end;
+
+procedure matchImportedTables(const moduleImportedTables: TArray<TTable>;
+  const importedTables: TArray<TExternalTable>);
+begin
+end;
+
+procedure matchImportedMemories(const moduleImportedMemories: TArray<TMemory>;
+  const importedMemories: TArray<TExternalMemory>);
+begin
+end;
+
+procedure matchImportedGlobals(const moduleImportedGlobals: TArray<TGlobalType>;
+  const importedGlobals: TArray<TExternalGlobal>);
+begin
+end;
+
+function evalConstantExpression(expr: TConstantExpression;
+  const importedGlobals: TArray<TExternalGlobal>;
+  const globals: TArray<TValue>): TValue;
+begin
+end;
 
 function Instantiate(
   const module: TModule;
@@ -224,7 +262,27 @@ function Instantiate(
   const importedGlobals: TArray<TExternalGlobal>;
   const memoryPagesLimit: Uint32): PInstance;
 begin
+  Assert(Length(module.funcsec) = Length(module.codesec));
 
+  matchImportedFunctions(module.importedFunctionTypes, importedFunctions);
+  matchImportedTables(module.importedTableTypes, importedTables);
+  matchImportedMemories(module.importedMemoryTypes, importedMemories);
+  matchImportedGlobals(module.importedGlobalTypes, importedGlobals);
+
+  // Init globals
+  var globals: TArray<TValue>;
+  SetLength(globals, Length(module.globalsec));
+  for var global in module.globalsec do
+  begin
+    // Constraint to use global.get only with imported globals is checked at validation.
+    Assert((global.expression.kind <> TConstantExpression.TKind.GlobalGet) or
+      (global.expression.globalIndex < Length(importedGlobals)));
+    var value := evalConstantExpression(global.expression, importedGlobals, globals);
+    globals := globals + [value];
+  end;
+
+  var instance := nil;
+  Result := instance;
 end;
 
 {$Region 'TExecutionResult'}

@@ -16,7 +16,8 @@ type
   private
     function createUnaryOperationExecutor(instr: TInstruction;
       const args: PValue): TExecutionResult;
-    function createBinaryOperationExecutor(instr: TInstruction): TExecutionResult;
+    function createBinaryOperationExecutor(instr: TInstruction;
+      const args: PValue): TExecutionResult;
   published
     procedure Test_i32_clz;
     procedure Test_i32_ctz;
@@ -52,12 +53,32 @@ begin
   code.instructions := [Byte(TInstruction.local_get), 0, 0, 0, 0,
     Byte(instr), Byte(TInstruction.end)];
   module.codesec := [code];
-  instance := instantiate(module);
+  instance := Instantiate(module);
   Result := Execute(instance, {funcIdx=}0, args);
 end;
 
-function TestNumeric.createBinaryOperationExecutor(instr: TInstruction): TExecutionResult;
+function TestNumeric.createBinaryOperationExecutor(
+  instr: TInstruction; const args: PValue): TExecutionResult;
+var
+  ityp: TInstructionType;
+  module: TModule;
+  ftyp: TFuncType;
+  code: TCode;
+  instance: PInstance;
 begin
+  ityp := getInstructionTypeTable[instr];
+  Check(ityp.inputsSize = 2);
+  Check(ityp.outputsSize = 1);
+  ftyp := TFuncType.From(ityp);
+  module.typesec := [ftyp];
+  module.funcsec := [TTypeIdx(0)];
+  code.maxStackHeight := 2;
+  code.localCount := 0;
+  code.instructions := [Byte(TInstruction.local_get), 0, 0, 0, 0,
+    Byte(TInstruction.local_get), 1, 0, 0, 0, Byte(instr), Byte(TInstruction.end)];
+  module.codesec := [code];
+  instance := Instantiate(module);
+  Result := Execute(instance, {funcIdx=}0, args);
 end;
 
 procedure TestNumeric.Test_i32_clz;
