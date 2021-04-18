@@ -1,13 +1,20 @@
+(* Oz.Wasm: A fast Delphi WebAssembly interpreter
+ * Copyright (c) 2021 Tomsk, Marat Shaimardanov
+ * SPDX-License-Identifier: (GPL-3.0-or-later OR Apache-2.0)
+ *)
 unit Oz.Wasm.TestNumeric;
 
 interface
 
 uses
   System.SysUtils, System.Math, TestFramework, DUnitX.TestFramework,
-  Oz.Wasm.Instruction;
+  Oz.Wasm.Types, Oz.Wasm.Module, Oz.Wasm.Instruction, Oz.Wasm.Interpreter;
 
 type
   TestNumeric = class(TTestCase)
+  private
+    function createUnaryOperationExecutor(instr: TInstruction): TExecutionResult;
+    function createBinaryOperationExecutor(instr: TInstruction): TExecutionResult;
   published
     procedure Test_i32_clz;
     procedure Test_i32_ctz;
@@ -22,6 +29,22 @@ implementation
 type
   TUint32Pair = record v, r: Uint32; end;
   TUint64Pair = record v, r: Uint64; end;
+
+function TestNumeric.createUnaryOperationExecutor(instr: TInstruction): TExecutionResult;
+var
+  ityp: TInstructionType;
+  module: TModule;
+  ftyp: TFuncType;
+begin
+  ityp := getInstructionTypeTable[instr];
+  Check(ityp.inputsSize = 1);
+  Check(ityp.outputsSize = 1);
+  ftyp := TFuncType.From(ityp);
+end;
+
+function TestNumeric.createBinaryOperationExecutor(instr: TInstruction): TExecutionResult;
+begin
+end;
 
 procedure TestNumeric.Test_i32_clz;
 const

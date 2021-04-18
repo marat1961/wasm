@@ -462,11 +462,11 @@ begin
   pc := PByte(@code.instructions) + code_offset;
 
   // When branch is taken, additional stack items must be dropped.
-  assert(Integer(stack_drop) >= 0);
-  assert(stack.Size >= stack_drop + arity);
+  Assert(Integer(stack_drop) >= 0);
+  Assert(stack.Size >= stack_drop + arity);
   if arity <> 0 then
   begin
-    assert(arity = 1);
+    Assert(arity = 1);
     r := stack.top^;
     stack.drop(stack_drop);
     stack.top^ := r;
@@ -590,9 +590,9 @@ begin
         end;
       TInstruction.call_indirect:
         begin
-          assert(instance.table <> nil);
+          Assert(instance.table <> nil);
           var expected_type_idx := pc.read<Uint32>;
-          assert(expected_type_idx < Uint32(Length(instance.module.typesec)));
+          Assert(expected_type_idx < Uint32(Length(instance.module.typesec)));
           var elem_idx := stack.pop.AsUint32;
           if elem_idx >= Uint32(Length(instance.table^)) then
             goto traps;
@@ -641,13 +641,13 @@ begin
       TInstruction.global_get:
         begin
           var idx := pc.read<Uint32>;
-          assert(idx < Uint32(Length(instance.importedGlobals) + Length(instance.globals)));
+          Assert(idx < Uint32(Length(instance.importedGlobals) + Length(instance.globals)));
           if idx < Uint32(Length(instance.importedGlobals)) then
             stack.push(instance.importedGlobals[idx].value)
           else
           begin
             var module_global_idx := idx - Uint32(Length(instance.importedGlobals));
-            assert(module_global_idx < Uint32(Length(instance.module.globalsec)));
+            Assert(module_global_idx < Uint32(Length(instance.module.globalsec)));
             stack.push(instance.globals[module_global_idx]);
           end;
         end;
@@ -656,14 +656,14 @@ begin
           var idx := pc.read<Uint32>;
           if idx < Uint32(Length(instance.importedGlobals)) then
           begin
-            assert(instance.importedGlobals[idx].typ.isMutable);
+            Assert(instance.importedGlobals[idx].typ.isMutable);
             instance.importedGlobals[idx].value := stack.pop;
           end
           else
           begin
             var module_global_idx := idx - Uint32(Length(instance.importedGlobals));
-            assert(module_global_idx < Uint32(Length(instance.module.globalsec)));
-            assert(instance.module.globalsec[module_global_idx].typ.isMutable);
+            Assert(module_global_idx < Uint32(Length(instance.module.globalsec)));
+            Assert(instance.module.globalsec[module_global_idx].typ.isMutable);
             instance.globals[module_global_idx] := stack.pop;
           end;
         end;
@@ -781,7 +781,7 @@ begin
         end;
       TInstruction.memory_size:
         begin
-          assert(Uint32(Length(memory)) mod PageSize = 0);
+          Assert(Uint32(Length(memory)) mod PageSize = 0);
           stack.push(Uint32(Length(memory)) div PageSize);
         end;
       TInstruction.memory_grow:
@@ -1469,13 +1469,13 @@ begin
       TInstruction.f64_reinterpret_i64:
         {reinterpret};
       else
-        assert(False, 'unreachable')
+        Assert(False, 'unreachable')
     end;
   until False;
 ends:
-  assert(pc = @code.instructions[Length(code.instructions)]);
+  Assert(pc = @code.instructions[Length(code.instructions)]);
   // End of code must be reached.
-  assert(stack.size = Uint32(Length(funcType.outputs)));
+  Assert(stack.size = Uint32(Length(funcType.outputs)));
 
   if stack.size <> 0 then
     exit(TExecutionResult.From(stack.top^))

@@ -62,11 +62,11 @@ function TModule.getFunctionType(idx: TFuncIdx): TFuncType;
 var
   typeIdx: Integer;
 begin
-  assert(idx < getFunctionCount);
+  Assert(idx < getFunctionCount);
   if idx < Length(importedFunctionTypes) then
     exit(importedFunctionTypes[idx]);
   typeIdx := funcsec[idx - Length(importedFunctionTypes)];
-  assert(typeIdx < Length(typesec));
+  Assert(typeIdx < Length(typesec));
   Result := typesec[typeIdx];
 end;
 
@@ -77,7 +77,7 @@ end;
 
 function TModule.getGlobalType(idx: TGlobalIdx): TGlobalType;
 begin
-  assert(idx < getGlobalCount);
+  Assert(idx < getGlobalCount);
   if idx < Length(importedGlobalTypes) then
     Result := importedGlobalTypes[idx]
   else
@@ -88,9 +88,9 @@ function TModule.getCode(funcIdx: TFuncIdx): TCode;
 var
   codeIdx: Integer;
 begin
-  assert(funcIdx >= Length(importedFunctionTypes) {function can't be imported});
+  Assert(funcIdx >= Length(importedFunctionTypes) {function can't be imported});
   codeIdx := funcIdx - Length(importedFunctionTypes);
-  assert(codeIdx < Length(codesec));
+  Assert(codeIdx < Length(codesec));
   Result := codesec[codeIdx];
 end;
 

@@ -20,10 +20,20 @@ type
 
   // Value types
   TValType = (
+    none = 0,
     i32 = $7f,
     i64 = $7e,
     f32 = $7d,
     f64 = $7c);
+
+  // Instruction signature. Wasm 1.0 spec only has instructions
+  // which take at most 2 parameters and return at most 1 result.
+  TInstructionType = record
+    inputs: array [0..1] of TValType;
+    outputs: TValType;
+    function inputsSize: Uint32;
+    function outputsSize: Uint32;
+  end;
 
   // Function types classify the signature of functions,
   // mapping a vector of parameters to a vector of results.
@@ -31,6 +41,7 @@ type
   TFuncType = record
     inputs: TArray<TValType>;
     outputs: TArray<TValType>;
+    constructor From(const ityp: TInstructionType);
     function Equals(const ft: TFuncType): Boolean;
   end;
 
@@ -173,12 +184,33 @@ type
 
 implementation
 
-{ TFuncType }
+{$Region 'TInstructionType'}
+
+function TInstructionType.inputsSize: Uint32;
+begin
+  Result := Ord(inputs[0] <> TValType.none) + Ord(inputs[1] <> TValType.none);
+end;
+
+function TInstructionType.outputsSize: Uint32;
+begin
+  Result := Ord(outputs <> TValType.none);
+end;
+
+{$EndRegion}
+
+{$Region 'TFuncType'}
 
 function TFuncType.Equals(const ft: TFuncType): Boolean;
 begin
   Result := (inputs = ft.inputs) and (outputs = ft.outputs);
 end;
+
+constructor TFuncType.From(const ityp: TInstructionType);
+begin
+
+end;
+
+{$EndRegion}
 
 end.
 
