@@ -16,7 +16,8 @@ uses
   Oz.Wasm.Module in 'src\Oz.Wasm.Module.pas',
   Oz.Wasm.Limits in 'src\Oz.Wasm.Limits.pas',
   Oz.Wasm.Interpreter in 'src\Oz.Wasm.Interpreter.pas',
-  Oz.Wasm.Utils in 'src\Oz.Wasm.Utils.pas';
+  Oz.Wasm.Utils in 'src\Oz.Wasm.Utils.pas',
+  Oz.Wasm.Instantiate in 'src\Oz.Wasm.Instantiate.pas';
 
 begin
   try

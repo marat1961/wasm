@@ -14,7 +14,8 @@ uses
   Oz.Wasm.Types in '..\src\Oz.Wasm.Types.pas',
   Oz.Wasm.Utils in '..\src\Oz.Wasm.Utils.pas',
   Oz.Wasm.Value in '..\src\Oz.Wasm.Value.pas',
-  Oz.Wasm.TestNumeric in 'Oz.Wasm.TestNumeric.pas';
+  Oz.Wasm.TestNumeric in 'Oz.Wasm.TestNumeric.pas',
+  Oz.Wasm.Instantiate in '..\src\Oz.Wasm.Instantiate.pas';
 
 {$R *.RES}
 

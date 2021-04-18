@@ -8,12 +8,14 @@ interface
 
 uses
   System.SysUtils, System.Math, TestFramework, DUnitX.TestFramework,
-  Oz.Wasm.Types, Oz.Wasm.Module, Oz.Wasm.Instruction, Oz.Wasm.Interpreter;
+  Oz.Wasm.Value, Oz.Wasm.Types, Oz.Wasm.Module, Oz.Wasm.Instruction,
+  Oz.Wasm.Instantiate, Oz.Wasm.Interpreter;
 
 type
   TestNumeric = class(TTestCase)
   private
-    function createUnaryOperationExecutor(instr: TInstruction): TExecutionResult;
+    function createUnaryOperationExecutor(instr: TInstruction;
+      const args: PValue): TExecutionResult;
     function createBinaryOperationExecutor(instr: TInstruction): TExecutionResult;
   published
     procedure Test_i32_clz;
@@ -30,16 +32,28 @@ type
   TUint32Pair = record v, r: Uint32; end;
   TUint64Pair = record v, r: Uint64; end;
 
-function TestNumeric.createUnaryOperationExecutor(instr: TInstruction): TExecutionResult;
+function TestNumeric.createUnaryOperationExecutor(
+  instr: TInstruction; const args: PValue): TExecutionResult;
 var
   ityp: TInstructionType;
   module: TModule;
   ftyp: TFuncType;
+  code: TCode;
+  instance: PInstance;
 begin
   ityp := getInstructionTypeTable[instr];
   Check(ityp.inputsSize = 1);
   Check(ityp.outputsSize = 1);
   ftyp := TFuncType.From(ityp);
+  module.typesec := [ftyp];
+  module.funcsec := [TTypeIdx(0)];
+  code.maxStackHeight := 1;
+  code.localCount := 0;
+  code.instructions := [Byte(TInstruction.local_get), 0, 0, 0, 0,
+    Byte(instr), Byte(TInstruction.end)];
+  module.codesec := [code];
+  instance := instantiate(module);
+  Result := Execute(instance, {funcIdx=}0, args);
 end;
 
 function TestNumeric.createBinaryOperationExecutor(instr: TInstruction): TExecutionResult;
