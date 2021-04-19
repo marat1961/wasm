@@ -57,6 +57,22 @@ type
 
 {$EndRegion}
 
+{$Region 'TBytesView'}
+
+  // The bytes view describes an object that can refer to a constant contiguous
+  // sequence of bytes with the first element of the sequence at position zero.
+  TBytesView = record
+  private
+    FBytes: PByte;
+    FSize: Uint32;
+    function GetByte(index: Uint32): Byte; inline;
+  public
+    property size: Uint32 read FSize;
+    property bytes[index: Uint32]: Byte read GetByte; default;
+  end;
+
+{$EndRegion}
+
 {$Region 'TStack<T>'}
 
   TStack<T> = record
@@ -192,6 +208,15 @@ end;
 function TSpan<T>.GetItem(Index: Integer): T;
 begin
   Result := PItem(PByte(FStart) + sizeof(T) * Index)^;
+end;
+
+{$EndRegion}
+
+{$Region 'TBytesView'}
+
+function TBytesView.GetByte(index: Uint32): Byte;
+begin
+  Result := PByte(FBytes + index)^;
 end;
 
 {$EndRegion}

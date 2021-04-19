@@ -97,6 +97,7 @@
         <DCCReference Include="..\src\Oz.Wasm.Value.pas"/>
         <DCCReference Include="Oz.Wasm.TestNumeric.pas"/>
         <DCCReference Include="..\src\Oz.Wasm.Instantiate.pas"/>
+        <DCCReference Include="..\src\Oz.Wasm.Parser.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

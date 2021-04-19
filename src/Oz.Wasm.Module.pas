@@ -14,6 +14,7 @@ uses
 
 type
 
+  PModule = ^TModule;
   TModule = record
   var
     // Sections

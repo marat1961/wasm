@@ -76,11 +76,11 @@ function Execute(instance: PInstance; funcIdx: TFuncIdx;
 // Execute a function from an instance.
 // Parameters
 //   instance  The instance.
-//   funcIdx  The function index. MUST be a valid index, otherwise undefined behaviour
-//             (including crash) happens.
+//   funcIdx   The function index. MUST be a valid index,
+//             otherwise undefined behaviour (including crash) happens.
 //   args      The pointer to the arguments. The number of items and their types must
-//             match the expected number of input parameters of the function, otherwise
-//             undefined behaviour (including crash) happens.
+//             match the expected number of input parameters of the function,
+//             otherwise undefined behaviour (including crash) happens.
 //   ctx       Execution context.
 function Execute(instance: PInstance; funcIdx: TFuncIdx;
   const args: PValue; var ctx: TExecutionContext): TExecutionResult; overload;

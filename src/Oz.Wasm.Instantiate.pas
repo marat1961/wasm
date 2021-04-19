@@ -13,12 +13,9 @@ uses
 {$T+}
 {$SCOPEDENUMS ON}
 
-type
-
-  WasmError = class(Exception);
-
 {$Region 'TExecutionResult: The result of an execution'}
 
+type
   TExecutionResult = record
     // This is true if the execution has trapped.
     trapped: Boolean;
@@ -32,6 +29,7 @@ type
     // Prefer using Void and Trap constants instead.
     constructor From(success: Boolean); overload;
   end;
+
 const
   BranchImmediateSize = 2 * sizeof(Uint32);
   // Shortcut for execution that resulted in successful execution,

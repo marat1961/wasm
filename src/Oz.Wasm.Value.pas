@@ -6,10 +6,14 @@ unit Oz.Wasm.Value;
 
 interface
 
+uses
+  System.SysUtils;
+
 {$T+}
 {$SCOPEDENUMS ON}
 
 type
+  WasmError = class(Exception);
 
   PValue = ^TValue;
   TValue = record
