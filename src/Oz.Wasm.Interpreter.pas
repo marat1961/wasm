@@ -354,7 +354,7 @@ begin
           var idx := pc.read<Uint32>;
           Assert(idx < Uint32(Length(instance.importedGlobals) + Length(instance.globals)));
           if idx < Uint32(Length(instance.importedGlobals)) then
-            stack.push(instance.importedGlobals[idx].value)
+            stack.push(instance.importedGlobals[idx].value^)
           else
           begin
             var module_global_idx := idx - Uint32(Length(instance.importedGlobals));
@@ -368,7 +368,7 @@ begin
           if idx < Uint32(Length(instance.importedGlobals)) then
           begin
             Assert(instance.importedGlobals[idx].typ.isMutable);
-            instance.importedGlobals[idx].value := stack.pop;
+            instance.importedGlobals[idx].value^ := stack.pop;
           end
           else
           begin

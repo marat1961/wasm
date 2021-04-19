@@ -163,7 +163,7 @@ type
 {$Region 'TExternalGlobal'}
 
   TExternalGlobal = record
-    value: TValue;
+    value: PValue;
     typ: TGlobalType;
   end;
 
@@ -228,23 +228,115 @@ begin
   begin
     var f := @importedFunc[i];
     if not moduleFuncType[i].equals(f.inputTypes, f.outputTypes) then
-     raise WasmError.CreateFmt(Err2,[i]);
+     raise WasmError.CreateFmt(Err2, [i]);
   end;
+end;
+
+procedure matchLimits(const externalLimits, moduleLimits: TLimits);
+const
+  Err1 = 'provided import''s min limit is above import''s max limit';
+  Err2 = 'provided import''s min is below import''s min defined in module';
+  Err3 = 'provided import''s max is above import''s max defined in module';
+begin
+  if externalLimits.max.hasValue and
+    (externalLimits.min > externalLimits.max.value) then
+    raise WasmError.Create(Err1);
+  if externalLimits.min < moduleLimits.min then
+    raise WasmError.Create(Err2);
+  if not moduleLimits.max.hasValue then
+    exit;
+  if externalLimits.max.hasValue and (externalLimits.max.value <= moduleLimits.max.value) then
+    exit;
+  raise WasmError.Create(Err3);
 end;
 
 procedure matchImportedTables(const moduleImportedTables: TArray<TTable>;
   const importedTables: TArray<TExternalTable>);
+const
+  Err1 = 'only 1 imported table is allowed';
+  Err2 = 'trying to provide imported table to a module that doesn''t define one';
+  Err3 = 'module defines an imported table but none was provided';
+  Err4 = 'provided imported table has a null pointer to data';
+  Err5 = 'provided imported table doesn''t fit provided limits';
 begin
+  Assert(Length(moduleImportedTables) <= 1);
+  if Length(importedTables) > 1 then
+    raise WasmError.Create(Err1);
+  if Length(moduleImportedTables) = 0 then
+  begin
+    if Length(importedTables) > 0 then
+     raise WasmError.Create(Err2);
+  end
+  else
+  begin
+    if Length(importedTables) = 0 then
+      raise WasmError.Create(Err3);
+    matchLimits(importedTables[0].limits, moduleImportedTables[0].limits);
+    if importedTables[0].table = nil then
+      raise WasmError.Create(Err4);
+    var size := Length(importedTables[0].table);
+    var min := importedTables[0].limits.min;
+    var max := importedTables[0].limits.max;
+    if (size < min) or (max.hasValue and (size > max.value)) then
+      raise WasmError.Create(Err5);
+  end;
 end;
 
 procedure matchImportedMemories(const moduleImportedMemories: TArray<TMemory>;
   const importedMemories: TArray<TExternalMemory>);
+const
+  Err1 = 'only 1 imported memory is allowed';
+  Err2 = 'trying to provide imported memory to a module that doesn''t define one';
+  Err3 = 'module defines an imported memory but none was provided';
+  Err4 = 'provided imported memory has a null pointer to data';
+  Err5 = 'provided imported memory size must be multiple of page size';
+  Err6 = 'provided imported memory doesn''t fit provided limits';
 begin
+  Assert(Length(moduleImportedMemories) <= 1);
+  if Length(importedMemories) > 1 then
+    raise WasmError.Create(Err1);
+  if Length(moduleImportedMemories) = 0 then
+  begin
+    if Length(importedMemories) > 0 then
+      raise WasmError.Create(Err2);
+  end
+  else
+  begin
+    if Length(importedMemories) = 0 then
+      raise WasmError.Create(Err3);
+    matchLimits(importedMemories[0].limits, moduleImportedMemories[0].limits);
+    if importedMemories[0].data = nil then
+      raise WasmError.Create(Err4);
+    var size := Length(importedMemories[0].data);
+    if size mod PageSize <> 0 then
+      raise WasmError.Create(Err5);
+    var min := importedMemories[0].limits.min;
+    var max := importedMemories[0].limits.max;
+    if (size < min * PageSize) or
+       (max.hasValue and (size > max.value * PageSize)) then
+      raise WasmError.Create(Err6);
+  end;
 end;
 
 procedure matchImportedGlobals(const moduleImportedGlobals: TArray<TGlobalType>;
   const importedGlobals: TArray<TExternalGlobal>);
+const
+  Err1 = 'module requires %d imported globals %d provided';
+  Err2 = 'global %d value type doesn''t match module''s global type';
+  Err3 = 'global %d mutability doesn''t match module''s global mutability';
+  Err4 = 'global %d has a null pointer to value';
 begin
+  if Length(moduleImportedGlobals) <> Length(importedGlobals) then
+    raise WasmError.CreateFmt(Err1, [Length(moduleImportedGlobals), Length(importedGlobals)]);
+  for var i := 0 to Length(importedGlobals) do
+  begin
+    if importedGlobals[i].typ.valueType <> moduleImportedGlobals[i].valueType then
+      raise WasmError.CreateFmt(Err2, [i]);
+    if importedGlobals[i].typ.isMutable <> moduleImportedGlobals[i].isMutable then
+      raise WasmError.CreateFmt(Err3, [i]);
+    if importedGlobals[i].value = nil then
+      raise WasmError.Create(Err4);
+  end;
 end;
 
 function evalConstantExpression(expr: TConstantExpression;
@@ -259,26 +351,26 @@ begin
     var globalIndex := expr.globalIndex;
     Assert(globalIndex < Length(importedGlobals) + Length(globals));
     if globalIndex < Length(importedGlobals) then
-      Result := importedGlobals[globalIndex].value
+      Result := importedGlobals[globalIndex].value^
     else
       Result := globals[globalIndex - Length(importedGlobals)];
   end;
 end;
 
-procedure allocateTable(const module_tables: TArray<TTable>;
-  const imported_tables: TArray<TExternalTable>;
+procedure allocateTable(const moduleTables: TArray<TTable>;
+  const importedTables: TArray<TExternalTable>;
   var table: TTableElements; var limits: TLimits);
 begin
-  Assert(Length(module_tables) + Length(imported_tables) <= 1);
-  if Length(module_tables) = 1 then
+  Assert(Length(moduleTables) + Length(importedTables) <= 1);
+  if Length(moduleTables) = 1 then
   begin
-    limits := module_tables[0].limits;
+    limits := moduleTables[0].limits;
     SetLength(table, limits.min);
   end
-  else if Length(imported_tables) = 1 then
+  else if Length(importedTables) = 1 then
   begin
-    limits := imported_tables[0].limits;
-    table := imported_tables[0].table;
+    limits := importedTables[0].limits;
+    table := importedTables[0].table;
   end
   else
   begin
@@ -336,8 +428,8 @@ function Instantiate(
   memoryPagesLimit: Uint32): PInstance;
 var
   globals: TArray<TValue>;
-  datasec_offsets: TArray<Uint64>;
-  elementsec_offsets: TArray<Uint64>;
+  datasecOffsets: TArray<Uint64>;
+  elementsecOffsets: TArray<Uint64>;
   table: TTableElements;
   tableLimits: TLimits;
   memory: TBytes;
@@ -367,7 +459,7 @@ begin
 
   // In case upper limit for local/imported memory is defined,
   // we adjust the hard memory limit, to ensure memory.grow will fail when exceeding it.
-  // Note: allocate_memory ensures memory's max limit is always below memory_pages_limit.
+  // Note: allocateMemory ensures memory's max limit is always below memoryPagesLimit.
   if memoryLimits.max.hasValue then
   begin
     Assert(memoryLimits.max.value <= memoryPagesLimit);
@@ -376,26 +468,26 @@ begin
 
   // Before starting to fill memory and table,
   // check that data and element segments are within bounds.
-  SetLength(datasec_offsets, Length(module.datasec));
+  SetLength(datasecOffsets, Length(module.datasec));
   for var data in module.datasec do
   begin
     // Offset is validated to be i32, but it's used in 64-bit calculation below.
     var offset: Uint64 := evalConstantExpression(data.offset, importedGlobals, globals).i32;
     if offset + Length(data.init) > Length(memory) then
       raise WasmError.Create('data segment is out of memory bounds');
-    datasec_offsets := datasec_offsets + [offset];
+    datasecOffsets := datasecOffsets + [offset];
   end;
 
   Assert((Length(module.elementsec) = 0) or (table <> nil));
 
-  SetLength(elementsec_offsets, Length(module.elementsec));
+  SetLength(elementsecOffsets, Length(module.elementsec));
   for var element in module.elementsec do
   begin
     // Offset is validated to be i32, but it's used in 64-bit calculation below.
     var offset: Uint64 := evalConstantExpression(element.offset, importedGlobals, globals).i32;
     if offset + Length(element.init) > Length(table) then
       raise WasmError.Create('element segment is out of table bounds');
-    elementsec_offsets := elementsec_offsets + [offset];
+    elementsecOffsets := elementsecOffsets + [offset];
   end;
 
   // Fill out memory based on data segments
@@ -404,7 +496,7 @@ begin
     // NOTE: these instructions can overlap
     var first: Pbyte := @module.datasec[i].init[0];
     var last: Pbyte := Pbyte(first) + Length(module.datasec[i].init) * sizeof(TData);
-    var dest := Pbyte(@memory[0]) + datasec_offsets[i];
+    var dest := Pbyte(@memory[0]) + datasecOffsets[i];
     TStd.Copy<TData>(first^, last^, dest^);
   end;
 
@@ -419,16 +511,16 @@ begin
   for var i := 0 to High(instance.module.elementsec) do
   begin
     // Overwrite table[offset..] with element.init
-    var idx := elementsec_offsets[i];
-    var it_table: PTableElement := @instance.table[idx];
+    var idx := elementsecOffsets[i];
+    var it: PTableElement := @instance.table[idx];
     var pme := instance.module.elementsec[i];
     for var j := 0 to High(pme.init) do
     begin
       idx := pme.init[j];
-      it_table.instance := instance;
-      it_table.funcIdx := idx;
-      it_table.sharedInstance := nil;
-      it_table := PTableElement(PByte(it_table) + sizeof(TTableElement));
+      it.instance := instance;
+      it.funcIdx := idx;
+      it.sharedInstance := nil;
+      it := PTableElement(PByte(it) + sizeof(TTableElement));
     end;
   end;
 
@@ -447,17 +539,17 @@ begin
       begin
         // Instance may be used by several functions added to the table,
         // so we need a shared ownership here.
-        var shared_instance: PInstance := instance;
-        for var i := 0 to High(shared_instance.module.elementsec) do
+        var sharedInstance: PInstance := instance;
+        for var i := 0 to High(sharedInstance.module.elementsec) do
         begin
-          var idx := elementsec_offsets[i];
-          var it_table: PTableElement := @shared_instance.table[idx];
-          var pme := shared_instance.module.elementsec[i];
+          var idx := elementsecOffsets[i];
+          var it: PTableElement := @sharedInstance.table[idx];
+          var pme := sharedInstance.module.elementsec[i];
           for var j := 0 to High(pme.init) do
           begin
             // Capture shared instance in table element.
-            it_table.sharedInstance := shared_instance;
-            it_table := PTableElement(PByte(it_table) + sizeof(TTableElement));
+            it.sharedInstance := sharedInstance;
+            it := PTableElement(PByte(it) + sizeof(TTableElement));
           end;
         end;
       end;
