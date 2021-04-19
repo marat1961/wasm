@@ -17,6 +17,9 @@ type
     // Copies exactly count values from the range beginning
     // at first to the range beginning at result.
     class function CopyN<T>(First: Pointer; Count: Uint32; var R): Pointer; static;
+    // Copies all elements in the range, defined by [First, Last)
+    // starting from First to Last - 1 to another range beginning at DestFirst.
+    class function Copy<T>(const First, Last; var DestFirst): PByte; static;
     // Assigns the given value to the first count elements
     // in the range beginning at first if count > 0.
     class procedure FillN<T>(First: Pointer; Count: Uint32; const Value: T); static;
@@ -135,6 +138,15 @@ begin
     Dec(Count);
   end;
   Result := @R;
+end;
+
+class function TStd.Copy<T>(const First, Last; var DestFirst): PByte;
+var
+  size: NativeInt;
+begin
+  size := PByte(@Last) - PByte(@First) - sizeof(T);
+  System.Move(First, DestFirst, size);
+  Result := PByte(@DestFirst) + size;
 end;
 
 class procedure TStd.FillN<T>(First: Pointer; Count: Uint32; const Value: T);

@@ -305,10 +305,10 @@ begin
           var expected_type_idx := pc.read<Uint32>;
           Assert(expected_type_idx < Uint32(Length(instance.module.typesec)));
           var elem_idx := stack.pop.AsUint32;
-          if elem_idx >= Uint32(Length(instance.table^)) then
+          if elem_idx >= Uint32(Length(instance.table)) then
             goto traps;
 
-          var called_func := instance.table^[elem_idx];
+          var called_func := instance.table[elem_idx];
           if called_func.instance = nil then
             // Table element not initialized.
             goto traps;

@@ -72,6 +72,7 @@ type
 {$Region 'TTableElement: Table element, which references a function in any instance'}
 
   PInstance = ^TInstance;
+  PTableElement = ^TTableElement;
   TTableElement = record
     // Pointer to function's instance or nullptr when table element is not initialized.
     instance: PInstance;
@@ -84,7 +85,6 @@ type
   end;
 
   TTableElements = TArray<TTableElement>;
-  PTable = ^TTableElements;
 
 {$EndRegion}
 
@@ -183,7 +183,7 @@ type
     // as unbounded in module.
     memoryPagesLimit: Uint32;
     // Instance table.
-    table: PTable;
+    table: TTableElements;
     // Table limits.
     tableLimits: TLimits;
     // Instance globals (excluding imported globals).
@@ -193,11 +193,9 @@ type
     // Imported globals.
     importedGlobals: TArray<TExternalGlobal>;
   public
-    constructor From(const module: TModule;
-      const memory: TBytes;
-      const memoryLimits: TLimits;
-      const memoryPagesLimit: Uint32;
-      table: PTable; tableLimits: TLimits;
+    constructor From(const module: TModule; const memory: TBytes;
+      const memoryLimits: TLimits; const memoryPagesLimit: Uint32;
+      const table: TTableElements; tableLimits: TLimits;
       const globals: TArray<TValue>;
       const importedFunctions: TArray<TExternalFunction>;
       const importedGlobals: TArray<TExternalGlobal>);
@@ -253,22 +251,34 @@ function evalConstantExpression(expr: TConstantExpression;
   const importedGlobals: TArray<TExternalGlobal>;
   const globals: TArray<TValue>): TValue;
 begin
+  if expr.kind = TConstantExpression.TKind.Constant then
+    Result := expr.constant
+  else
+  begin
+    Assert(expr.kind = TConstantExpression.TKind.GlobalGet);
+    var globalIndex := expr.globalIndex;
+    Assert(globalIndex < Length(importedGlobals) + Length(globals));
+    if globalIndex < Length(importedGlobals) then
+      Result := importedGlobals[globalIndex].value
+    else
+      Result := globals[globalIndex - Length(importedGlobals)];
+  end;
 end;
 
 procedure allocateTable(const module_tables: TArray<TTable>;
   const imported_tables: TArray<TExternalTable>;
-  var table: PTable; var limits: TLimits);
+  var table: TTableElements; var limits: TLimits);
 begin
   Assert(Length(module_tables) + Length(imported_tables) <= 1);
   if Length(module_tables) = 1 then
   begin
     limits := module_tables[0].limits;
-    table := System.AllocMem(limits.min * sizeof(TTableElement));
+    SetLength(table, limits.min);
   end
   else if Length(imported_tables) = 1 then
   begin
     limits := imported_tables[0].limits;
-    table := @imported_tables[0].table;
+    table := imported_tables[0].table;
   end
   else
   begin
@@ -324,6 +334,15 @@ function Instantiate(
   const importedMemories: TArray<TExternalMemory>;
   const importedGlobals: TArray<TExternalGlobal>;
   memoryPagesLimit: Uint32): PInstance;
+var
+  globals: TArray<TValue>;
+  datasec_offsets: TArray<Uint64>;
+  elementsec_offsets: TArray<Uint64>;
+  table: TTableElements;
+  tableLimits: TLimits;
+  memory: TBytes;
+  memoryLimits: TLimits;
+  instance: PInstance;
 begin
   Assert(Length(module.funcsec) = Length(module.codesec));
 
@@ -333,7 +352,6 @@ begin
   matchImportedGlobals(module.importedGlobalTypes, importedGlobals);
 
   // Init globals
-  var globals: TArray<TValue>;
   SetLength(globals, Length(module.globalsec));
   for var global in module.globalsec do
   begin
@@ -344,12 +362,7 @@ begin
     globals := globals + [value];
   end;
 
-  var table: PTable;
-  var tableLimits: TLimits;
   allocateTable(module.tablesec, importedTables, table, tableLimits);
-
-  var memory: TBytes;
-  var memoryLimits: TLimits;
   allocateMemory(module.memorysec, importedMemories, memoryPagesLimit, memory, memoryLimits);
 
   // In case upper limit for local/imported memory is defined,
@@ -361,7 +374,97 @@ begin
     memoryPagesLimit := memoryLimits.max.value;
   end;
 
-  var instance := nil;
+  // Before starting to fill memory and table,
+  // check that data and element segments are within bounds.
+  SetLength(datasec_offsets, Length(module.datasec));
+  for var data in module.datasec do
+  begin
+    // Offset is validated to be i32, but it's used in 64-bit calculation below.
+    var offset: Uint64 := evalConstantExpression(data.offset, importedGlobals, globals).i32;
+    if offset + Length(data.init) > Length(memory) then
+      raise WasmError.Create('data segment is out of memory bounds');
+    datasec_offsets := datasec_offsets + [offset];
+  end;
+
+  Assert((Length(module.elementsec) = 0) or (table <> nil));
+
+  SetLength(elementsec_offsets, Length(module.elementsec));
+  for var element in module.elementsec do
+  begin
+    // Offset is validated to be i32, but it's used in 64-bit calculation below.
+    var offset: Uint64 := evalConstantExpression(element.offset, importedGlobals, globals).i32;
+    if offset + Length(element.init) > Length(table) then
+      raise WasmError.Create('element segment is out of table bounds');
+    elementsec_offsets := elementsec_offsets + [offset];
+  end;
+
+  // Fill out memory based on data segments
+  for var i := 0 to High(module.datasec) do
+  begin
+    // NOTE: these instructions can overlap
+    var first: Pbyte := @module.datasec[i].init[0];
+    var last: Pbyte := Pbyte(first) + Length(module.datasec[i].init) * sizeof(TData);
+    var dest := Pbyte(@memory[0]) + datasec_offsets[i];
+    TStd.Copy<TData>(first^, last^, dest^);
+  end;
+
+  // We need to create instance before filling table,
+  // because table functions will capture the pointer to instance.
+  instance := AllocMem(sizeof(TInstance));
+  instance^ := TInstance.From(module, memory, memoryLimits,
+    memoryPagesLimit, table, tableLimits, globals,
+    importedFunctions, importedGlobals);
+
+  // Fill the table based on elements segment
+  for var i := 0 to High(instance.module.elementsec) do
+  begin
+    // Overwrite table[offset..] with element.init
+    var idx := elementsec_offsets[i];
+    var it_table: PTableElement := @instance.table[idx];
+    var pme := instance.module.elementsec[i];
+    for var j := 0 to High(pme.init) do
+    begin
+      idx := pme.init[j];
+      it_table.instance := instance;
+      it_table.funcIdx := idx;
+      it_table.sharedInstance := nil;
+      it_table := PTableElement(PByte(it_table) + sizeof(TTableElement));
+    end;
+  end;
+
+  // Run start function if present
+  if instance.module.startfunc.hasValue then
+  begin
+    var funcidx := instance.module.startfunc.value;
+    Assert(funcidx < Uint32(Length(instance.importedFunctions) + Length(instance.module.funcsec)));
+    if Execute(instance, funcidx, nil).trapped then
+    begin
+      // When element section modified imported table, and then start function
+      // trapped, modifications to the table are not rolled back.
+      // Instance in this case is not being returned to the user, so it needs
+      // to be kept alive as long as functions using it are alive in the table.
+      if (Length(importedTables) > 0) and (Length(instance.module.elementsec) > 0) then
+      begin
+        // Instance may be used by several functions added to the table,
+        // so we need a shared ownership here.
+        var shared_instance: PInstance := instance;
+        for var i := 0 to High(shared_instance.module.elementsec) do
+        begin
+          var idx := elementsec_offsets[i];
+          var it_table: PTableElement := @shared_instance.table[idx];
+          var pme := shared_instance.module.elementsec[i];
+          for var j := 0 to High(pme.init) do
+          begin
+            // Capture shared instance in table element.
+            it_table.sharedInstance := shared_instance;
+            it_table := PTableElement(PByte(it_table) + sizeof(TTableElement));
+          end;
+        end;
+      end;
+      raise WasmError.Create('start function failed to execute');
+    end;
+  end;
+
   Result := instance;
 end;
 
@@ -466,7 +569,7 @@ end;
 
 constructor TInstance.From(const module: TModule; const memory: TBytes;
   const memoryLimits: TLimits; const memoryPagesLimit: Uint32;
-  table: PTable; tableLimits: TLimits;
+  const table: TTableElements; tableLimits: TLimits;
   const globals: TArray<TValue>;
   const importedFunctions: TArray<TExternalFunction>;
   const importedGlobals: TArray<TExternalGlobal>);
