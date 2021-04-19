@@ -21,7 +21,7 @@ type
     trapped: Boolean;
     // This is true if value contains valid data.
     hasValue: Boolean;
-    // The result value. Valid if `hasValue = true`.
+    // The result value. Valid if 'hasValue = true'.
     value: TValue;
     // Constructs result with a value.
     constructor From(const value: TValue); overload;
