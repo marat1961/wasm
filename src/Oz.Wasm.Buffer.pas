@@ -33,6 +33,8 @@ type
     function readByte: Byte;
     // Read bytes
     function readBytes: TBytes;
+    // read value
+    function readValue<T>: T;
     // Read an Uint32 value
     function readUint32: Uint32;
     // Read a string value
@@ -99,6 +101,12 @@ begin
   SetLength(Result, size);
   Move(FCurrent^, Pointer(Result)^, size);
   Inc(FCurrent, size);
+end;
+
+function TInputBuffer.readValue<T>: T;
+begin
+  Move(FCurrent^, Result, sizeof(T));
+  Inc(FCurrent, sizeof(T));
 end;
 
 function TInputBuffer.readLeb128: Uint32;
