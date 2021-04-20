@@ -21,10 +21,8 @@ type
   strict private
     buf: TInputBuffer;
   private 
-    //
     function parseByte: Byte; inline;
-    // 
-    function parseValue<T: record>: T;
+    function parseValue<T: record>: T; inline;
     // Parses 'expr', i.e. a function's instructions residing in the code section.
     // https://webassembly.github.io/spec/core/binary/instructions.html#binary-expr
     // parameters:
