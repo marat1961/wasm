@@ -12,8 +12,21 @@ uses
 {$T+}
 {$SCOPEDENUMS ON}
 
+{$Region 'WasmError'}
+
 type
-  WasmError = class(Exception);
+  EWasmError = class(Exception)
+  const
+    NotImplemented = 0;
+    EofEncounterd = 1;
+    InvalidSize = 2;
+  public
+    constructor Create(ErrNo: Integer); overload;
+  end;
+
+{$EndRegion}
+
+{$Region 'TValue'}
 
   PValue = ^TValue;
   TValue = record
@@ -34,7 +47,27 @@ type
       4: (f64: Double);
   end;
 
+{$EndRegion}
+
 implementation
+
+{$Region 'WasmError'}
+
+constructor EWasmError.Create(ErrNo: Integer);
+var Msg: string;
+begin
+  case ErrNo of
+    NotImplemented: Msg := 'not implemented';
+    EofEncounterd: Msg := 'eof encounterd';
+    InvalidSize: Msg := 'invalid size';
+    else Msg := 'Error: ' + IntToStr(ErrNo);
+  end;
+  Create(Msg);
+end;
+
+{$EndRegion}
+
+{$Region 'TValue'}
 
 constructor TValue.From(v: Uint64);
 begin
@@ -75,6 +108,8 @@ function TValue.AsDouble: Double;
 begin
   Result := f64;
 end;
+
+{$EndRegion}
 
 end.
 

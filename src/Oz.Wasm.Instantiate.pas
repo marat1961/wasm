@@ -221,12 +221,12 @@ const
   Err2 = 'function %d type doesn''t match module''s imported function type';
 begin
   if Length(moduleFuncType) <> Length(importedFunc) then
-    raise WasmError.CreateFmt(Err1, [Length(moduleFuncType), Length(importedFunc)]);
+    raise EWasmError.CreateFmt(Err1, [Length(moduleFuncType), Length(importedFunc)]);
   for var i := 0 to High(importedFunc) do
   begin
     var f := @importedFunc[i];
     if not moduleFuncType[i].equals(f.inputTypes, f.outputTypes) then
-     raise WasmError.CreateFmt(Err2, [i]);
+     raise EWasmError.CreateFmt(Err2, [i]);
   end;
 end;
 
@@ -238,14 +238,14 @@ const
 begin
   if externalLimits.max.hasValue and
     (externalLimits.min > externalLimits.max.value) then
-    raise WasmError.Create(Err1);
+    raise EWasmError.Create(Err1);
   if externalLimits.min < moduleLimits.min then
-    raise WasmError.Create(Err2);
+    raise EWasmError.Create(Err2);
   if not moduleLimits.max.hasValue then
     exit;
   if externalLimits.max.hasValue and (externalLimits.max.value <= moduleLimits.max.value) then
     exit;
-  raise WasmError.Create(Err3);
+  raise EWasmError.Create(Err3);
 end;
 
 procedure matchImportedTables(const moduleImportedTables: TArray<TTable>;
@@ -259,24 +259,24 @@ const
 begin
   Assert(Length(moduleImportedTables) <= 1);
   if Length(importedTables) > 1 then
-    raise WasmError.Create(Err1);
+    raise EWasmError.Create(Err1);
   if Length(moduleImportedTables) = 0 then
   begin
     if Length(importedTables) > 0 then
-     raise WasmError.Create(Err2);
+     raise EWasmError.Create(Err2);
   end
   else
   begin
     if Length(importedTables) = 0 then
-      raise WasmError.Create(Err3);
+      raise EWasmError.Create(Err3);
     matchLimits(importedTables[0].limits, moduleImportedTables[0].limits);
     if importedTables[0].table = nil then
-      raise WasmError.Create(Err4);
+      raise EWasmError.Create(Err4);
     var size := Length(importedTables[0].table);
     var min := importedTables[0].limits.min;
     var max := importedTables[0].limits.max;
     if (size < min) or (max.hasValue and (size > max.value)) then
-      raise WasmError.Create(Err5);
+      raise EWasmError.Create(Err5);
   end;
 end;
 
@@ -292,27 +292,27 @@ const
 begin
   Assert(Length(moduleImportedMemories) <= 1);
   if Length(importedMemories) > 1 then
-    raise WasmError.Create(Err1);
+    raise EWasmError.Create(Err1);
   if Length(moduleImportedMemories) = 0 then
   begin
     if Length(importedMemories) > 0 then
-      raise WasmError.Create(Err2);
+      raise EWasmError.Create(Err2);
   end
   else
   begin
     if Length(importedMemories) = 0 then
-      raise WasmError.Create(Err3);
+      raise EWasmError.Create(Err3);
     matchLimits(importedMemories[0].limits, moduleImportedMemories[0].limits);
     if importedMemories[0].data = nil then
-      raise WasmError.Create(Err4);
+      raise EWasmError.Create(Err4);
     var size := Length(importedMemories[0].data);
     if size mod PageSize <> 0 then
-      raise WasmError.Create(Err5);
+      raise EWasmError.Create(Err5);
     var min := importedMemories[0].limits.min;
     var max := importedMemories[0].limits.max;
     if (size < min * PageSize) or
        (max.hasValue and (size > max.value * PageSize)) then
-      raise WasmError.Create(Err6);
+      raise EWasmError.Create(Err6);
   end;
 end;
 
@@ -325,15 +325,15 @@ const
   Err4 = 'global %d has a null pointer to value';
 begin
   if Length(moduleImportedGlobals) <> Length(importedGlobals) then
-    raise WasmError.CreateFmt(Err1, [Length(moduleImportedGlobals), Length(importedGlobals)]);
+    raise EWasmError.CreateFmt(Err1, [Length(moduleImportedGlobals), Length(importedGlobals)]);
   for var i := 0 to Length(importedGlobals) do
   begin
     if importedGlobals[i].typ.valueType <> moduleImportedGlobals[i].valueType then
-      raise WasmError.CreateFmt(Err2, [i]);
+      raise EWasmError.CreateFmt(Err2, [i]);
     if importedGlobals[i].typ.isMutable <> moduleImportedGlobals[i].isMutable then
-      raise WasmError.CreateFmt(Err3, [i]);
+      raise EWasmError.CreateFmt(Err3, [i]);
     if importedGlobals[i].value = nil then
-      raise WasmError.Create(Err4);
+      raise EWasmError.Create(Err4);
   end;
 end;
 
@@ -388,14 +388,14 @@ var
   lim: PLimits;
 begin
   if memoryPagesLimit > MaxMemoryPagesLimit then
-    raise WasmError.CreateFmt(Err1, [Uint64(MaxMemoryPagesLimit) * PageSize]);
+    raise EWasmError.CreateFmt(Err1, [Uint64(MaxMemoryPagesLimit) * PageSize]);
   Assert(Length(moduleMemories) + Length(importedMemories) <= 1);
   if Length(moduleMemories) = 1 then
   begin
     lim := @moduleMemories[0].limits;
     if (lim.min > memoryPagesLimit) or
        (lim.max.hasValue and (lim.max.value > memoryPagesLimit)) then
-      raise WasmError.CreateFmt(Err2, [memoryPagesLimit * PageSize]);
+      raise EWasmError.CreateFmt(Err2, [memoryPagesLimit * PageSize]);
 
     SetLength(memory, lim.min * PageSize);
     limits := moduleMemories[0].limits;
@@ -405,7 +405,7 @@ begin
     lim := @importedMemories[0].limits;
     if (lim.min > memoryPagesLimit) or
        (lim.max.hasValue and (lim.max.value > memoryPagesLimit)) then
-      raise WasmError.CreateFmt(Err3, [memoryPagesLimit * PageSize]);
+      raise EWasmError.CreateFmt(Err3, [memoryPagesLimit * PageSize]);
 
     memory := importedMemories[0].data;
     limits := importedMemories[0].limits;
@@ -472,7 +472,7 @@ begin
     // Offset is validated to be i32, but it's used in 64-bit calculation below.
     var offset: Uint64 := evalConstantExpression(data.offset, importedGlobals, globals).i32;
     if offset + Length(data.init) > Length(memory) then
-      raise WasmError.Create('data segment is out of memory bounds');
+      raise EWasmError.Create('data segment is out of memory bounds');
     datasecOffsets := datasecOffsets + [offset];
   end;
 
@@ -484,7 +484,7 @@ begin
     // Offset is validated to be i32, but it's used in 64-bit calculation below.
     var offset: Uint64 := evalConstantExpression(element.offset, importedGlobals, globals).i32;
     if offset + Length(element.init) > Length(table) then
-      raise WasmError.Create('element segment is out of table bounds');
+      raise EWasmError.Create('element segment is out of table bounds');
     elementsecOffsets := elementsecOffsets + [offset];
   end;
 
@@ -551,7 +551,7 @@ begin
           end;
         end;
       end;
-      raise WasmError.Create('start function failed to execute');
+      raise EWasmError.Create('start function failed to execute');
     end;
   end;
 
