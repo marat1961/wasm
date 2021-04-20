@@ -16,8 +16,8 @@ uses
 
 type
   TParserResult<T> = record
-    first: PByte;
-    second: T;
+    pos: PByte;
+    value: T;
   end;
 
   TWasmParser = record
@@ -25,6 +25,9 @@ type
     procedure raiseEOF;
     function parseByte(const pos, ends: PByte): TParserResult<Byte>;
     function parseValue<T: record>(const pos, ends: PByte): TParserResult<T>;
+
+    // Little Endian Base 128 code compression
+    function leb128uDecode(pos, ends: PByte): TParserResult<Uint32>;
 
     // Parses 'expr', i.e. a function's instructions residing in the code section.
     // https://webassembly.github.io/spec/core/binary/instructions.html#binary-expr
@@ -78,8 +81,8 @@ end;
 function TWasmParser.parseByte(const pos, ends: PByte): TParserResult<Byte>;
 begin
   if pos >= ends then raiseEOF;
-  Result.first := pos + 1;
-  Result.second := pos^;
+  Result.pos := pos + 1;
+  Result.value := pos^;
 end;
 
 function TWasmParser.parseValue<T>(const pos, ends: PByte): TParserResult<T>;
@@ -90,8 +93,8 @@ var
 begin
   size := sizeof(T);
   if ends - pos < size then raiseEOF;
-  Result.first := pos + size;
-  Result.second := Pt(pos)^;
+  Result.pos := pos + size;
+  Result.value := Pt(pos)^;
 end;
 
 function TWasmParser.parseExpr(const pos, ends: PByte; funcIidx: TFuncIdx;
@@ -113,6 +116,33 @@ end;
 function TWasmParser.validateValtype(v: Byte): TValType;
 begin
 
+end;
+
+function TWasmParser.leb128uDecode(pos, ends: PByte): TParserResult<Uint32>;
+const
+  size = sizeof(Uint32);
+var
+  shift: Integer;
+  r: Uint32;
+begin
+  r := 0;
+  shift := 0;
+  while shift < size * 8 do
+  begin
+    if pos >= ends then raiseEOF;
+    r := r or Uint32((Uint32(pos^) and $7F) shl shift);
+    if pos^ and $80 = 0 then
+    begin
+      if pos^ <> (r shr shift) then
+        raise WasmError.Create('invalid LEB128 encoding: unused bits set');
+      Result.pos := pos + size;
+      Result.value := PUint32(pos)^;
+      exit;
+    end;
+    Inc(pos, size);
+    shift := shift + 7;
+  end;
+  raise WasmError.Create('invalid LEB128 encoding: too many bytes');
 end;
 
 {$EndRegion}
