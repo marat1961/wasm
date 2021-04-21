@@ -7,7 +7,7 @@ unit Oz.Wasm.Buffer;
 interface
 
 uses
-  System.SysUtils, Oz.Wasm.Value;
+  System.SysUtils, Oz.Wasm.Value, Oz.Wasm.Utils;
 
 {$T+}
 {$SCOPEDENUMS ON}
@@ -23,8 +23,11 @@ type
     FLast: PByte;
     FCurrent: PByte;
     FOwnsData: Boolean;
+    function GetBufferSize: Integer; inline;
+    function GetUnreadSize: Integer; inline;
   public
-    class function From(const Buf: TBytes): TInputBuffer; static;
+    class function From(const input: TBytesView): TInputBuffer; overload; static;
+    class function From(const Buf: TBytes): TInputBuffer; overload; static;
     procedure Init(Buf: PByte; BufSize: Integer; OwnsData: Boolean);
     procedure Free;
     // No more data
@@ -36,11 +39,23 @@ type
     // read value
     function readValue<T>: T;
     // Read an Uint32 value
-    function readUint32: Uint32;
+    function readUint32: Uint32; inline;
     // Read a string value
     function readString: string;
     // Decode unsigned integer. Little Endian Base 128 code compression.
     function readLeb128: Uint32;
+    // Returns whether bytes start at the current position with the given bytes.
+    function startsWith(const bytes: TBytesView): Boolean;
+    // Skip size bytes
+    procedure skip(size: Integer); inline;
+    // Check if the unread part of the buffer is big enough
+    procedure checkUnread(size: Integer);
+    // Buffer current position
+    property current: PByte read FCurrent;
+    // Buffer size
+    property bufferSize: Integer read GetBufferSize;
+    // The size of the unread part of the buffer
+    property unreadSize: Integer read GetUnreadSize;
   end;
 
 {$EndRegion}
@@ -48,6 +63,11 @@ type
 implementation
 
 {$Region 'TInputBuffer'}
+
+class function TInputBuffer.From(const input: TBytesView): TInputBuffer;
+begin
+  Result.Init(input.data, input.size, False);
+end;
 
 class function TInputBuffer.From(const Buf: TBytes): TInputBuffer;
 begin
@@ -74,6 +94,22 @@ begin
   if FOwnsData then
     FreeMem(FBuf);
   Self := Default(TInputBuffer);
+end;
+
+function TInputBuffer.GetBufferSize: Integer;
+begin
+  Result := FLast - FBuf;
+end;
+
+function TInputBuffer.GetUnreadSize: Integer;
+begin
+  Result := FLast - FCurrent;
+end;
+
+procedure TInputBuffer.checkUnread(size: Integer);
+begin
+  if UnreadSize < size then
+    EWasmError.Create(EWasmError.EofEncounterd);
 end;
 
 function TInputBuffer.Eof: Boolean;
@@ -147,6 +183,21 @@ end;
 function TInputBuffer.readUint32: Uint32;
 begin
   Result := readLeb128;
+end;
+
+function TInputBuffer.startsWith(const bytes: TBytesView): Boolean;
+begin
+  if bytes.size = 0 then
+    Result := True
+  else if unreadSize >= bytes.size then
+    Result := CompareMem(FCurrent, bytes.data, bytes.size)
+  else
+    Result := False;
+end;
+
+procedure TInputBuffer.skip(size: Integer);
+begin
+  Inc(FCurrent, size);
 end;
 
 {$EndRegion}
