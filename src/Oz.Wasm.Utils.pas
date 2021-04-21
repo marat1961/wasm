@@ -27,7 +27,7 @@ type
 
 {$EndRegion}
 
-{$Region 'TOptional<T>: '}
+{$Region 'TOptional<T>: optional value'}
 
   TOptional<T> = record
     value: T;
@@ -67,7 +67,9 @@ type
     FSize: Uint32;
     function GetByte(index: Uint32): Byte; inline;
   public
+    class function From(bytes: PByte; size: Uint32): TBytesView; static;
     property size: Uint32 read FSize;
+    property data: PByte read FBytes;
     property bytes[index: Uint32]: Byte read GetByte; default;
   end;
 
@@ -213,6 +215,12 @@ end;
 {$EndRegion}
 
 {$Region 'TBytesView'}
+
+class function TBytesView.From(bytes: PByte; size: Uint32): TBytesView;
+begin
+  Result.FBytes := bytes;
+  Result.FSize := size;
+end;
 
 function TBytesView.GetByte(index: Uint32): Byte;
 begin
