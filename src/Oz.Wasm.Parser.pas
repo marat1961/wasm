@@ -207,14 +207,28 @@ begin
   end;
 end;
 
-function parseTypeIdx(const buf: TInputBuffer): TTypeIdx;
+function parseTypeIdx(const buf: TInputBuffer): TTypeIdx; inline;
 begin
-
+  Result := buf.readUint32;
 end;
 
 function parseExport(const buf: TInputBuffer): TExport;
 begin
-
+  Result.name := buf.readString;
+  var kind := buf.readByte;
+  case kind of
+    $00:
+      Result.kind := TExternalKind.Function;
+    $01:
+      Result.kind := TExternalKind.Table;
+    $02:
+      Result.kind := TExternalKind.Memory;
+    $03:
+      Result.kind := TExternalKind.Global;
+    else
+      raise EWasmError.CreateFmt('unexpected export kind value %d', [kind]);
+  end;
+  Result.index := buf.readUint32;
 end;
 
 function parseElement(const buf: TInputBuffer): TElement;
