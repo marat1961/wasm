@@ -46,6 +46,8 @@ type
     function readUint32: Uint32; inline;
     // Read a string value
     function readString: string;
+    // Read a string value
+    function readUTF8String: System.UTF8String;
     // Decode unsigned integer. Little Endian Base 128 code compression.
     function readLeb128: Uint32;
     // Returns whether bytes start at the current position with the given bytes.
@@ -190,6 +192,11 @@ begin
   raise EWasmError.Create('invalid LEB128 encoding: too many bytes');
 end;
 
+function TInputBuffer.readUint32: Uint32;
+begin
+  Result := readLeb128;
+end;
+
 function TInputBuffer.readString: string;
 var
   buf, text: TBytes;
@@ -200,9 +207,12 @@ begin
   Result := TEncoding.Unicode.GetString(text);
 end;
 
-function TInputBuffer.readUint32: Uint32;
+function TInputBuffer.readUTF8String: System.UTF8String;
+var
+  buf: TBytes;
 begin
-  Result := readLeb128;
+  buf := readBytes;
+  Result := TEncoding.UTF8.GetString(buf);
 end;
 
 function TInputBuffer.startsWith(const bytes: TBytesView): Boolean;

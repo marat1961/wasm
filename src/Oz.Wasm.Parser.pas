@@ -23,7 +23,7 @@ type
     WasmPrefix: array [0..7] of Byte = ($00, $61, $73, $6d, $01, $00, $00, $00);
   private
     // Validates and converts the given byte to valtype.
-    function validateValtype(v: Byte): TValType;
+    class function validateValtype(v: Byte): TValType; static;
     // Validates constant expression
     procedure validateConstantExpression(const expr: TConstantExpression;
       const module: TModule; expectedTtype: TValType);
@@ -57,17 +57,41 @@ end;
 // Parses a string and validates it against UTF-8 encoding rules
 function parseString(const buf: TInputBuffer): System.UTF8String;
 begin
-
+  Result := buf.readUTF8String;
 end;
 
 function parseValType(const buf: TInputBuffer): TValType;
 begin
+  Result := TWasmParser.validateValtype(buf.readByte);
+end;
 
+function parseLimits(const buf: TInputBuffer): TLimits;
+begin
+  var kind := buf.readByte;
+  case kind of
+    $00:
+      begin
+        result.min := buf.readUint32;
+        result.max.Reset;
+      end;
+    $01:
+      begin
+        result.min := buf.readUint32;
+        result.max := TOptional<Uint32>.From(buf.readUint32);
+        if result.min > result.max.value then
+          raise EWasmError.Create('malformed limits (minimum is larger than maximum)');
+      end;
+    else
+      raise EWasmError.CreateFmt('invalid limits %d', [kind]);
+  end;
 end;
 
 function parseTable(const buf: TInputBuffer): TTable;
 begin
-
+  var elemtype := buf.readByte;
+  if elemtype <> FuncRef then
+    raise EWasmError.CreateFmt('unexpected table elemtype: %d', [elemtype]);
+  Result.limits := parseLimits(buf);
 end;
 
 function parseMemory(const buf: TInputBuffer): TMemory;
@@ -416,7 +440,7 @@ begin
 
 end;
 
-function TWasmParser.validateValtype(v: Byte): TValType;
+class function TWasmParser.validateValtype(v: Byte): TValType;
 begin
   if InRange(v, $7C, $7F) then
     Result := TValType(v)

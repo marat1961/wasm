@@ -33,6 +33,7 @@ type
     value: T;
     hasValue: Boolean;
     constructor From(value: T);
+    procedure Reset;
   end;
 
 {$EndRegion}
@@ -190,6 +191,11 @@ constructor TOptional<T>.From(value: T);
 begin
   Self.value := value;
   hasValue := True;
+end;
+
+procedure TOptional<T>.Reset;
+begin
+  Self := Default(TOptional<T>);
 end;
 
 {$EndRegion}
