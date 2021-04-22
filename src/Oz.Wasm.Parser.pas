@@ -7,8 +7,9 @@ unit Oz.Wasm.Parser;
 interface
 
 uses
-  System.SysUtils, System.Math, System.Generics.Collections,
-  Oz.Wasm.Utils, Oz.Wasm.Value, Oz.Wasm.Buffer,  Oz.Wasm.Types, Oz.Wasm.Module;
+  System.SysUtils, System.Math, System.Generics.Collections, 
+  Oz.Wasm.Utils, Oz.Wasm.Buffer, Oz.Wasm.Value, Oz.Wasm.Limits, Oz.Wasm.Instruction, 
+  Oz.Wasm.Types, Oz.Wasm.Module;
 
 {$T+}
 {$SCOPEDENUMS ON}
@@ -96,12 +97,83 @@ end;
 
 function parseMemory(const buf: TInputBuffer): TMemory;
 begin
+  Result.limits := parseLimits(buf);
+  if (Result.limits.min > MaxMemoryPagesLimit) or
+     (Result.limits.max.hasValue and (Result.limits.max.value > MaxMemoryPagesLimit)) then
+    raise EWasmError.Create('maximum memory page limit exceeded');
+end;
 
+function parseConstantExpression(const buf: TInputBuffer; 
+  expectedType: TValType): TConstantExpression;
+begin
+  // Module is needed to know the type of globals accessed with global.get,
+  // therefore here we can validate the type only for const instructions.
+  var constantActualType := TValType.none;
+  var opcode := buf.readByte;
+
+  var instr := TInstruction(opcode);
+  case instr of
+    TInstruction.end:
+      raise EWasmError.Create('constant expression is empty');
+    TInstruction.global_get:
+      begin
+        Result.kind := TConstantExpression.TKind.GlobalGet;
+        Result.globalIndex := buf.readUint32;
+      end;
+    TInstruction.i32_const:
+      begin
+        Result.kind := TConstantExpression.TKind.Constant;
+        var value := buf.readUint32;
+        Result.constant.i32 := value;
+        constantActualType := TValType.i32;
+      end;
+    TInstruction.i64_const:
+      begin
+        Result.kind := TConstantExpression.TKind.Constant;
+        var value := buf.readUint32;
+        Result.constant.i64 := Uint64(value);
+        constantActualType := TValType.i64;
+      end;
+    TInstruction.f32_const:
+      begin
+        Result.kind := TConstantExpression.TKind.Constant;
+        Result.constant.f32 := buf.readValue<Uint32>;
+        constantActualType := TValType.f32;
+      end;
+    TInstruction.f64_const:
+      begin
+        Result.kind := TConstantExpression.TKind.Constant;
+        Result.constant.f64 := buf.readValue<Uint64>;
+        constantActualType := TValType.f64;
+      end;
+    else
+      raise EWasmError.CreateFmt(
+        'unexpected instruction in the constant expression: %d', [buf.current - 1]);
+  end;
+
+  var endOpcode := buf.readByte;
+
+  if TInstruction(endOpcode) <> TInstruction.end then
+    raise EWasmError.Create('constant expression has multiple instructions');
+
+  if (constantActualType = TValType.none) and (constantActualType <> expectedType) then
+    raise EWasmError.Create('constant expression type mismatch');
+end;
+
+function parseGlobalType(const buf: TInputBuffer): TGlobalType;
+begin
+  Result.valueType := parseValType(buf);
+  var mutability := buf.readByte;
+  if not (mutability in [0, 1]) then
+    raise EWasmError.CreateFmt(
+      'unexpected byte value, expected 0 or 1 for global mutability', [mutability]);
+  Result.isMutable := Boolean(mutability);
 end;
 
 function parseGlobal(const buf: TInputBuffer): TGlobal;
 begin
-
+  Result.typ := parseGlobalType(buf);
+  Result.expression := parseConstantExpression(buf, Result.typ.valueType);
 end;
 
 function parseImport(const buf: TInputBuffer): TImport;
@@ -128,7 +200,7 @@ begin
     $03:
       begin
         Result.kind := TExternalKind.Global;
-        Result.desc.global := buf.readValue<TGlobalType>;
+        Result.desc.global := parseGlobalType(buf);
       end;
     else
       raise EWasmError.CreateFmt('unexpected import kind value %d', [kind]);
