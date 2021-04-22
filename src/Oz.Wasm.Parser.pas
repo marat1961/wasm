@@ -21,29 +21,7 @@ type
   TWasmParser = record
   const
     WasmPrefix: array [0..7] of Byte = ($00, $61, $73, $6d, $01, $00, $00, $00);
-  strict private
-    buf: TInputBuffer;
   private
-    function parseByte: Byte; inline;
-    // Parses 'expr', i.e. a function's instructions residing in the code section.
-    // https://webassembly.github.io/spec/core/binary/instructions.html#binary-expr
-    // parameters:
-    //   pos       The beginning of the expr binary input.
-    //   ends      The end of the binary input.
-    //   funcIdx   Index of the function being parsed.
-    //   locals    Vector of local type and counts for the function being parsed.
-    //   module    Module that this code is part of.
-    //   returns   The parsed code.
-    class function parseExpr(buf: TInputBuffer; funcIidx: TFuncIdx;
-      const locals: TArray<TLocals>; const module: TModule): TCode; static;
-    // Parses a string and validates it against UTF-8 encoding rules.
-    // parameters:
-    //   pos      The beginning of the string input.
-    //   ends     The end of the string input.
-    //   returns  The parsed and UTF-8 validated string.
-    function parseString: System.UTF8String;
-    // Parses the vec of i32 values. This is used in parseExpr.
-    function parseVec32: TArray<Uint32>;
     // Validates and converts the given byte to valtype.
     function validateValtype(v: Byte): TValType;
     // Validates constant expression
@@ -65,17 +43,29 @@ type
 
 implementation
 
+function parseVec32(const buf: TInputBuffer): TArray<Uint32>;
+var
+  size: UInt32;
+begin
+  size := buf.readUint32;
+  Assert(size < 128);
+  SetLength(result, size);
+  for var i := 0 to size - 1 do
+    Result[i] := buf.readUint32;
+end;
+
+// Parses a string and validates it against UTF-8 encoding rules
+function parseString(const buf: TInputBuffer): System.UTF8String;
+begin
+
+end;
+
 function parseValType(const buf: TInputBuffer): TValType;
 begin
 
 end;
 
-function parseImport(const buf: TInputBuffer): TImport;
-begin
-
-end;
-
-function parseTypeIdx(const buf: TInputBuffer): TTypeIdx;
+function parseTable(const buf: TInputBuffer): TTable;
 begin
 
 end;
@@ -90,12 +80,43 @@ begin
 
 end;
 
-function parseExport(const buf: TInputBuffer): TExport;
+function parseImport(const buf: TInputBuffer): TImport;
+begin
+  result.module := buf.readString;
+  result.name := buf.readString;
+  var kind := buf.readByte;
+  case kind of
+    $00:
+      begin
+        Result.kind := TExternalKind.Function;
+        Result.desc.functionTypeIndex := buf.readUint32;
+      end;
+    $01:
+      begin
+        Result.kind := TExternalKind.Table;
+        Result.desc.table := parseTable(buf);
+      end;
+    $02:
+      begin
+        Result.kind := TExternalKind.Memory;
+        Result.desc.memory := parseMemory(buf);
+      end;
+    $03:
+      begin
+        Result.kind := TExternalKind.Global;
+        Result.desc.global := buf.readValue<TGlobalType>;
+      end;
+    else
+      raise EWasmError.CreateFmt('unexpected import kind value %d', [kind]);
+  end;
+end;
+
+function parseTypeIdx(const buf: TInputBuffer): TTypeIdx;
 begin
 
 end;
 
-function parseTable(const buf: TInputBuffer): TTable;
+function parseExport(const buf: TInputBuffer): TExport;
 begin
 
 end;
@@ -132,19 +153,25 @@ begin
 
 end;
 
+// Parses 'expr', i.e. a function's instructions residing in the code section.
+// https://webassembly.github.io/spec/core/binary/instructions.html#binary-expr
+// parameters:
+//   buf       Input buffer.
+//   funcIdx   Index of the function being parsed.
+//   locals    Vector of local type and counts for the function being parsed.
+//   module    Module that this code is part of.
+//   returns   The parsed code.
+function parseExpr(buf: TInputBuffer; funcIidx: TFuncIdx;
+  const locals: TArray<TLocals>; const module: TModule): TCode;
+begin
+
+end;
+
 {$Region 'TWasmParser'}
 
 function TWasmParser.parse(input: TBytesView): PModule;
-
-  procedure checkPrefix;
-  begin
-    var prefix := TBytesView.From(@WasmPrefix[0], sizeof(WasmPrefix));
-    if not buf.startsWith(prefix) then
-      raise EWasmError.Create('invalid wasm module prefix');
-    buf.skip(sizeof(WasmPrefix));
-  end;
-
 var
+  buf: TInputBuffer;
   module: PModule;
   id: TSectionId;
   codeBinaries: TArray<TCodeView>;
@@ -154,7 +181,12 @@ var
   exportNames: TDictionary<string, Integer>;
 begin
   buf := TInputBuffer.From(input);
-  checkPrefix;
+
+  var prefix := TBytesView.From(@WasmPrefix[0], sizeof(WasmPrefix));
+  if not buf.startsWith(prefix) then
+    raise EWasmError.Create('invalid wasm module prefix');
+  buf.skip(sizeof(WasmPrefix));
+
   module := GetMemory(sizeof(TModule));
 
   lastId := TSectionId.custom;
@@ -197,7 +229,7 @@ begin
       TSectionId.custom:
         begin
           // NOTE: this section can be ignored, but the name must be parseable (and valid UTF-8)
-          parseString;
+          parseString(buf);
           // These sections are ignored for now.
           buf.skip(size);
         end
@@ -350,11 +382,6 @@ begin
   Result := module;
 end;
 
-function TWasmParser.parseByte: Byte;
-begin
-  Result := buf.readByte;
-end;
-
 function TWasmParser.parseCode(codeBinary: TCodeView; funcIdx: TFuncIdx;
   const module: TModule): TCode;
 var
@@ -372,11 +399,7 @@ begin
       raise EWasmError.Create('too many local variables');
   end;
 
-  // TODO: Clarify in spec what happens
-  // if count of locals and arguments exceed Uint32::max()
-  //       Leave this assert here for the time being.
   Assert(localCount + Length(module.typesec[module.funcsec[funcIdx]].inputs) <= Uint32.MaxValue);
-
   var code := parseExpr(b, funcIdx, localsVec, module);
 
   // Size is the total bytes of locals and expressions.
@@ -385,21 +408,6 @@ begin
 
   code.localCount := Uint32(localCount);
   Result := code;
-end;
-
-class function TWasmParser.parseExpr(buf: TInputBuffer; funcIidx: TFuncIdx;
-  const locals: TArray<TLocals>; const module: TModule): TCode;
-begin
-
-end;
-
-function TWasmParser.parseString: System.UTF8String;
-begin
-
-end;
-
-function TWasmParser.parseVec32: TArray<Uint32>;
-begin
 end;
 
 procedure TWasmParser.validateConstantExpression(const expr: TConstantExpression;

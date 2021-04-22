@@ -18,6 +18,8 @@ type
 
   PInputBuffer = ^TInputBuffer;
   TInputBuffer = record
+  type
+    TParseFunc<T> = function(const buf: TInputBuffer): T;
   private
     FBuf: PByte;
     FLast: PByte;
@@ -38,6 +40,8 @@ type
     function readBytes: TBytes;
     // read value
     function readValue<T>: T;
+    // read array of value
+    function readArray<T>(parse: TParseFunc<T>): TArray<T>;
     // Read an Uint32 value
     function readUint32: Uint32; inline;
     // Read a string value
@@ -52,6 +56,10 @@ type
     procedure checkUnread(size: Integer);
     // Buffer current position
     property current: PByte read FCurrent;
+    // Buffer begin position
+    property begins: PByte read FBuf;
+    // Buffer end position
+    property ends: PByte read FLast;
     // Buffer size
     property bufferSize: Integer read GetBufferSize;
     // The size of the unread part of the buffer
@@ -143,6 +151,18 @@ function TInputBuffer.readValue<T>: T;
 begin
   Move(FCurrent^, Result, sizeof(T));
   Inc(FCurrent, sizeof(T));
+end;
+
+function TInputBuffer.readArray<T>(parse: TParseFunc<T>): TArray<T>;
+var
+  size: UInt32;
+begin
+  size := readUint32;
+  // Reserve memory for vec elements if 'size' value is reasonable.
+  Assert(size < 128);
+  SetLength(result, size);
+  for var i := 0 to size - 1 do
+    Result[i] := parse(Self);
 end;
 
 function TInputBuffer.readLeb128: Uint32;

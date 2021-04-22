@@ -129,7 +129,7 @@ type
       1: (globalIndex: Uint32);
   end;
 
-  TGlobalType = record
+  TGlobalType = packed record
     valueType: TValType;
     isMutable: Boolean;
   end;
