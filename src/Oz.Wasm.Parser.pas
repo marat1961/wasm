@@ -23,11 +23,6 @@ type
   const
     WasmPrefix: array [0..7] of Byte = ($00, $61, $73, $6d, $01, $00, $00, $00);
   private
-    // Validates and converts the given byte to valtype.
-    class function validateValtype(v: Byte): TValType; static;
-    // Validates constant expression
-    procedure validateConstantExpression(const expr: TConstantExpression;
-      const module: TModule; expectedTtype: TValType);
     // Parse code
     function parseCode(codeBinary: TCodeView; funcIdx: TFuncIdx;
       const module: TModule): TCode;
@@ -61,9 +56,32 @@ begin
   Result := buf.readUTF8String;
 end;
 
+// Validates and converts the given byte to valtype.
+function validateValtype(v: Byte): TValType;
+begin
+  if InRange(v, $7C, $7F) then
+    Result := TValType(v)
+  else
+    raise EWasmError.CreateFmt('invalid TValType %d', [v]);
+end;
+
+procedure validateConstantExpression(const expr: TConstantExpression;
+  const module: TModule; expectedTtype: TValType);
+begin
+  if expr.kind = TConstantExpression.TKind.Constant then exit;
+  var globalIdx := expr.globalIndex;
+  if globalIdx >= module.getGlobalCount then
+    raise EWasmError.Create('invalid global index in constant expression');
+  var globalType := module.getGlobalType(globalIdx);
+  if globalType.isMutable then
+    raise EWasmError.Create('constant expression can use global.get only for const globals');
+  if globalType.valueType <> expectedTtype then
+    raise EWasmError.Create('constant expression type mismatch');
+end;
+
 function parseValType(const buf: TInputBuffer): TValType;
 begin
-  Result := TWasmParser.validateValtype(buf.readByte);
+  Result := validateValtype(buf.readByte);
 end;
 
 function parseLimits(const buf: TInputBuffer): TLimits;
@@ -212,6 +230,11 @@ begin
   Result := buf.readUint32;
 end;
 
+function parseVecFuncIdx(const buf: TInputBuffer): TArray<TFuncIdx>; inline;
+begin
+  Result := parseVec32(buf);  
+end;
+
 function parseExport(const buf: TInputBuffer): TExport;
 begin
   Result.name := buf.readString;
@@ -233,12 +256,25 @@ end;
 
 function parseElement(const buf: TInputBuffer): TElement;
 begin
+  var table_index: TTableIdx := buf.readUint32;
+  if table_index <> 0 then
+    raise EWasmError.CreateFmt(
+      'invalid table index %d (only table 0 is allowed)', [table_index]);
 
+  // Offset expression is required to have i32 result value
+  // https://webassembly.github.io/spec/core/valid/modules.html#element-segments
+  Result.offset := parseConstantExpression(buf, TValType.i32);
+  Result.init := parseVecFuncIdx(buf);
 end;
 
 function parseCodeView(const buf: TInputBuffer): TCodeView;
 begin
-
+  var codeSize := buf.readUint32;
+  var codeBegin := buf.current;
+  if codeBegin + codeSize > buf.ends then
+    raise EWasmError.Create('unexpected EOF');
+  // Only record the code reference in wasm binary.
+  Result := TCodeView.From(codeBegin, codeSize);
 end;
 
 function parseFuncType(const buf: TInputBuffer): TFuncType;
@@ -502,9 +538,9 @@ begin
   var localsVec := b.readArray<TLocals>(parseLocals);
 
   localCount := 0;
-  for var l in localsVec do
+  for var v in localsVec do
   begin
-    Inc(localCount, l.count);
+    Inc(localCount, v.count);
     if localCount > Uint32.MaxValue then
       raise EWasmError.Create('too many local variables');
   end;
@@ -518,34 +554,6 @@ begin
 
   code.localCount := Uint32(localCount);
   Result := code;
-end;
-
-procedure TWasmParser.validateConstantExpression(const expr: TConstantExpression;
-  const module: TModule; expectedTtype: TValType);
-begin
-
-end;
-
-class function TWasmParser.validateValtype(v: Byte): TValType;
-begin
-  if InRange(v, $7C, $7F) then
-    Result := TValType(v)
-  else
-    raise EWasmError.CreateFmt('invalid TValType %d', [v]);
-end;
-
-procedure validateConstantExpression(const expr: TConstantExpression;
-  const module: TModule; expectedTtype: TValType);
-begin
-  if expr.kind = TConstantExpression.TKind.Constant then exit;
-  var globalIdx := expr.globalIndex;
-  if globalIdx >= module.getGlobalCount then
-    raise EWasmError.Create('invalid global index in constant expression');
-  var globalType := module.getGlobalType(globalIdx);
-  if globalType.isMutable then
-    raise EWasmError.Create('constant expression can use global.get only for const globals');
-  if globalType.valueType <> expectedTtype then
-    raise EWasmError.Create('constant expression type mismatch');
 end;
 
 {$EndRegion}
