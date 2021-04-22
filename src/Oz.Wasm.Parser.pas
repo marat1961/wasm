@@ -25,7 +25,6 @@ type
     buf: TInputBuffer;
   private
     function parseByte: Byte; inline;
-    function parseValue<T: record>: T; inline;
     // Parses 'expr', i.e. a function's instructions residing in the code section.
     // https://webassembly.github.io/spec/core/binary/instructions.html#binary-expr
     // parameters:
@@ -35,8 +34,8 @@ type
     //   locals    Vector of local type and counts for the function being parsed.
     //   module    Module that this code is part of.
     //   returns   The parsed code.
-    function parseExpr(funcIidx: TFuncIdx; const locals: TArray<TLocals>; 
-      const module: TModule): TCode;
+    class function parseExpr(buf: TInputBuffer; funcIidx: TFuncIdx;
+      const locals: TArray<TLocals>; const module: TModule): TCode; static;
     // Parses a string and validates it against UTF-8 encoding rules.
     // parameters:
     //   pos      The beginning of the string input.
@@ -45,28 +44,93 @@ type
     function parseString: System.UTF8String;
     // Parses the vec of i32 values. This is used in parseExpr.
     function parseVec32: TArray<Uint32>;
-    //
-    function parseVec<T>: TArray<T>;
     // Validates and converts the given byte to valtype.
     function validateValtype(v: Byte): TValType;
     // Validates constant expression
     procedure validateConstantExpression(const expr: TConstantExpression;
       const module: TModule; expectedTtype: TValType);
     // Parse code
-    function parseCode(codeBinary: TCodeView; funcIdx: TFuncIdx; 
+    function parseCode(codeBinary: TCodeView; funcIdx: TFuncIdx;
       const module: TModule): TCode;
   public
     // Parses input into a Module.
     // parameters:
-    //  input    The WebAssembly binary. No need to persist by the caller,
-    //           since all relevant parts will be copied.
-    //  returns  The parsed module.
+    //   input    The WebAssembly binary. No need to persist by the caller,
+    //            since all relevant parts will be copied.
+    //   returns  The parsed module.
     function parse(input: TBytesView): PModule;
   end;
 
 {$EndRegion}
 
 implementation
+
+function parseValType(const buf: TInputBuffer): TValType;
+begin
+
+end;
+
+function parseImport(const buf: TInputBuffer): TImport;
+begin
+
+end;
+
+function parseTypeIdx(const buf: TInputBuffer): TTypeIdx;
+begin
+
+end;
+
+function parseMemory(const buf: TInputBuffer): TMemory;
+begin
+
+end;
+
+function parseGlobal(const buf: TInputBuffer): TGlobal;
+begin
+
+end;
+
+function parseExport(const buf: TInputBuffer): TExport;
+begin
+
+end;
+
+function parseTable(const buf: TInputBuffer): TTable;
+begin
+
+end;
+
+function parseElement(const buf: TInputBuffer): TElement;
+begin
+
+end;
+
+function parseCodeView(const buf: TInputBuffer): TCodeView;
+begin
+
+end;
+
+function parseFuncType(const buf: TInputBuffer): TFuncType;
+begin
+  var kind := buf.readByte;
+  if kind <> $60 then
+    raise EWasmError.CreateFmt(
+      'unexpected byte value %d , expected $60 for functype', [Ord(kind)]);
+  Result.inputs := buf.readArray<TValType>(parseValType);
+  Result.outputs := buf.readArray<TValType>(parseValType);
+  if Length(Result.outputs) > 1 then
+    raise EWasmError.Create('function has more than one result');
+end;
+
+function parseData(const buf: TInputBuffer): TData;
+begin
+
+end;
+
+function parseLocals(const buf: TInputBuffer): TLocals;
+begin
+
+end;
 
 {$Region 'TWasmParser'}
 
@@ -80,7 +144,7 @@ function TWasmParser.parse(input: TBytesView): PModule;
     buf.skip(sizeof(WasmPrefix));
   end;
 
-var 
+var
   module: PModule;
   id: TSectionId;
   codeBinaries: TArray<TCodeView>;
@@ -92,7 +156,7 @@ begin
   buf := TInputBuffer.From(input);
   checkPrefix;
   module := GetMemory(sizeof(TModule));
-  
+
   lastId := TSectionId.custom;
   while not buf.Eof do
   begin
@@ -109,27 +173,27 @@ begin
     expectedSectionEnd := buf.current + size;
     case id of
       TSectionId.type:
-        module.typesec := parseVec<TFuncType>;
+        module.typesec := buf.readArray<TFuncType>(parseFuncType);
       TSectionId.import:
-        module.importsec := parseVec<TImport>;
+        module.importsec := buf.readArray<TImport>(parseImport);
       TSectionId.function:
-        module.funcsec := parseVec<TTypeIdx>;
+        module.funcsec := buf.readArray<TTypeIdx>(parseTypeIdx);
       TSectionId.table:
-        module.tablesec := parseVec<TTable>;
+        module.tablesec := buf.readArray<TTable>(parseTable);
       TSectionId.memory:
-        module.memorysec := parseVec<TMemory>;
+        module.memorysec := buf.readArray<TMemory>(parseMemory);
       TSectionId.global:
-        module.globalsec := parseVec<TGlobal>;
+        module.globalsec := buf.readArray<TGlobal>(parseGlobal);
       TSectionId.export:
-        module.exportsec := parseVec<TExport>;
+        module.exportsec := buf.readArray<TExport>(parseExport);
       TSectionId.start:
         module.startfunc := TOptional<TFuncIdx>.From(TFuncIdx(buf.readUint32));
       TSectionId.element:
-        module.elementsec := parseVec<TElement>;
+        module.elementsec := buf.readArray<TElement>(parseElement);
       TSectionId.code:
-        codeBinaries := parseVec<TCodeView>;
+        codeBinaries := buf.readArray<TCodeView>(parseCodeView);
       TSectionId.data:
-        module.datasec := parseVec<TData>;
+        module.datasec := buf.readArray<TData>(parseData);
       TSectionId.custom:
         begin
           // NOTE: this section can be ignored, but the name must be parseable (and valid UTF-8)
@@ -184,7 +248,7 @@ begin
 
   if (Length(module.memorysec) > 0) and (Length(module.importedMemoryTypes) > 0) then
     raise EWasmError.Create(
-      'both module memory and imported memory are defined' + 
+      'both module memory and imported memory are defined' +
       '(at most one of them is allowed)');
 
   if (Length(module.datasec) <> 0) and not module.hasMemory then
@@ -293,17 +357,38 @@ end;
 
 function TWasmParser.parseCode(codeBinary: TCodeView; funcIdx: TFuncIdx;
   const module: TModule): TCode;
+var
+  localCount: Uint64;
+  b: TInputBuffer;
 begin
+  b := TInputBuffer.From(codeBinary);
+  var localsVec := b.readArray<TLocals>(parseLocals);
 
+  localCount := 0;
+  for var l in localsVec do
+  begin
+    Inc(localCount, l.count);
+    if localCount > Uint32.MaxValue then
+      raise EWasmError.Create('too many local variables');
+  end;
+
+  // TODO: Clarify in spec what happens
+  // if count of locals and arguments exceed Uint32::max()
+  //       Leave this assert here for the time being.
+  Assert(localCount + Length(module.typesec[module.funcsec[funcIdx]].inputs) <= Uint32.MaxValue);
+
+  var code := parseExpr(b, funcIdx, localsVec, module);
+
+  // Size is the total bytes of locals and expressions.
+  if b.current <> b.ends then
+    raise EWasmError.Create('malformed size field for function');
+
+  code.localCount := Uint32(localCount);
+  Result := code;
 end;
 
-function TWasmParser.parseValue<T>: T;
-begin
-  Result := buf.readValue<T>;
-end;
-
-function TWasmParser.parseExpr(funcIidx: TFuncIdx; const locals: TArray<TLocals>; 
-  const module: TModule): TCode;
+class function TWasmParser.parseExpr(buf: TInputBuffer; funcIidx: TFuncIdx;
+  const locals: TArray<TLocals>; const module: TModule): TCode;
 begin
 
 end;
@@ -315,11 +400,6 @@ end;
 
 function TWasmParser.parseVec32: TArray<Uint32>;
 begin
-end;
-
-function TWasmParser.parseVec<T>: TArray<T>;
-begin
-
 end;
 
 procedure TWasmParser.validateConstantExpression(const expr: TConstantExpression;
