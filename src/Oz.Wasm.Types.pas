@@ -7,7 +7,7 @@ unit Oz.Wasm.Types;
 interface
 
 uses
-  System.Classes, System.SysUtils, Oz.Wasm.Utils, Oz.Wasm.Value;
+  System.Classes, System.SysUtils, System.Math, Oz.Wasm.Utils, Oz.Wasm.Value;
 
 {$T+}
 {$SCOPEDENUMS ON}
@@ -185,7 +185,18 @@ type
     init: TBytes;
   end;
 
+// Validates and converts the given byte to valtype.
+function validateValtype(v: Byte): TValType;
+
 implementation
+
+function validateValtype(v: Byte): TValType;
+begin
+  if InRange(v, $7C, $7F) then
+    Result := TValType(v)
+  else
+    raise EWasmError.CreateFmt('invalid TValType %d', [v]);
+end;
 
 {$Region 'TInstructionType'}
 

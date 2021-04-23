@@ -17,7 +17,8 @@ uses
   Oz.Wasm.TestNumeric in 'Oz.Wasm.TestNumeric.pas',
   Oz.Wasm.Instantiate in '..\src\Oz.Wasm.Instantiate.pas',
   Oz.Wasm.Parser in '..\src\Oz.Wasm.Parser.pas',
-  Oz.Wasm.Buffer in '..\src\Oz.Wasm.Buffer.pas';
+  Oz.Wasm.Buffer in '..\src\Oz.Wasm.Buffer.pas',
+  Oz.Wasm.ParseExpression in '..\src\Oz.Wasm.ParseExpression.pas';
 
 {$R *.RES}
 

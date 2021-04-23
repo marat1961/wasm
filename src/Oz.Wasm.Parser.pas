@@ -56,15 +56,6 @@ begin
   Result := buf.readUTF8String;
 end;
 
-// Validates and converts the given byte to valtype.
-function validateValtype(v: Byte): TValType;
-begin
-  if InRange(v, $7C, $7F) then
-    Result := TValType(v)
-  else
-    raise EWasmError.CreateFmt('invalid TValType %d', [v]);
-end;
-
 procedure validateConstantExpression(const expr: TConstantExpression;
   const module: TModule; expectedTtype: TValType);
 begin
