@@ -9,7 +9,7 @@ interface
 uses
   System.SysUtils, System.Math, System.Generics.Collections, 
   Oz.Wasm.Utils, Oz.Wasm.Buffer, Oz.Wasm.Value, Oz.Wasm.Limits, Oz.Wasm.Instruction, 
-  Oz.Wasm.Types, Oz.Wasm.Module;
+  Oz.Wasm.Types, Oz.Wasm.Module, Oz.Wasm.ParseExpression;
 
 {$T+}
 {$SCOPEDENUMS ON}
@@ -39,7 +39,7 @@ type
 
 implementation
 
-function parseVec32(const buf: TInputBuffer): TArray<Uint32>;
+function parseVec32(var buf: TInputBuffer): TArray<Uint32>;
 var
   size: UInt32;
 begin
@@ -51,7 +51,7 @@ begin
 end;
 
 // Parses a string and validates it against UTF-8 encoding rules
-function parseString(const buf: TInputBuffer): System.UTF8String;
+function parseString(var buf: TInputBuffer): System.UTF8String;
 begin
   Result := buf.readUTF8String;
 end;
@@ -79,12 +79,12 @@ begin
     raise EWasmError.Create('constant expression type mismatch');
 end;
 
-function parseValType(const buf: TInputBuffer): TValType;
+function parseValType(var buf: TInputBuffer): TValType;
 begin
   Result := validateValtype(buf.readByte);
 end;
 
-function parseLimits(const buf: TInputBuffer): TLimits;
+function parseLimits(var buf: TInputBuffer): TLimits;
 begin
   var kind := buf.readByte;
   case kind of
@@ -105,7 +105,7 @@ begin
   end;
 end;
 
-function parseTable(const buf: TInputBuffer): TTable;
+function parseTable(var buf: TInputBuffer): TTable;
 begin
   var elemtype := buf.readByte;
   if elemtype <> FuncRef then
@@ -113,7 +113,7 @@ begin
   Result.limits := parseLimits(buf);
 end;
 
-function parseMemory(const buf: TInputBuffer): TMemory;
+function parseMemory(var buf: TInputBuffer): TMemory;
 begin
   Result.limits := parseLimits(buf);
   if (Result.limits.min > MaxMemoryPagesLimit) or
@@ -121,7 +121,7 @@ begin
     raise EWasmError.Create('maximum memory page limit exceeded');
 end;
 
-function parseConstantExpression(const buf: TInputBuffer; 
+function parseConstantExpression(var buf: TInputBuffer; 
   expectedType: TValType): TConstantExpression;
 begin
   // Module is needed to know the type of globals accessed with global.get,
@@ -178,7 +178,7 @@ begin
     raise EWasmError.Create('constant expression type mismatch');
 end;
 
-function parseGlobalType(const buf: TInputBuffer): TGlobalType;
+function parseGlobalType(var buf: TInputBuffer): TGlobalType;
 begin
   Result.valueType := parseValType(buf);
   var mutability := buf.readByte;
@@ -188,13 +188,13 @@ begin
   Result.isMutable := Boolean(mutability);
 end;
 
-function parseGlobal(const buf: TInputBuffer): TGlobal;
+function parseGlobal(var buf: TInputBuffer): TGlobal;
 begin
   Result.typ := parseGlobalType(buf);
   Result.expression := parseConstantExpression(buf, Result.typ.valueType);
 end;
 
-function parseImport(const buf: TInputBuffer): TImport;
+function parseImport(var buf: TInputBuffer): TImport;
 begin
   Result.module := buf.readString;
   Result.name := buf.readString;
@@ -225,17 +225,17 @@ begin
   end;
 end;
 
-function parseTypeIdx(const buf: TInputBuffer): TTypeIdx; inline;
+function parseTypeIdx(var buf: TInputBuffer): TTypeIdx; inline;
 begin
   Result := buf.readUint32;
 end;
 
-function parseVecFuncIdx(const buf: TInputBuffer): TArray<TFuncIdx>; inline;
+function parseVecFuncIdx(var buf: TInputBuffer): TArray<TFuncIdx>; inline;
 begin
   Result := parseVec32(buf);  
 end;
 
-function parseExport(const buf: TInputBuffer): TExport;
+function parseExport(var buf: TInputBuffer): TExport;
 begin
   Result.name := buf.readString;
   var kind := buf.readByte;
@@ -254,7 +254,7 @@ begin
   Result.index := buf.readUint32;
 end;
 
-function parseElement(const buf: TInputBuffer): TElement;
+function parseElement(var buf: TInputBuffer): TElement;
 begin
   var table_index: TTableIdx := buf.readUint32;
   if table_index <> 0 then
@@ -267,7 +267,7 @@ begin
   Result.init := parseVecFuncIdx(buf);
 end;
 
-function parseCodeView(const buf: TInputBuffer): TCodeView;
+function parseCodeView(var buf: TInputBuffer): TCodeView;
 begin
   var codeSize := buf.readUint32;
   var codeBegin := buf.current;
@@ -277,7 +277,7 @@ begin
   Result := TCodeView.From(codeBegin, codeSize);
 end;
 
-function parseFuncType(const buf: TInputBuffer): TFuncType;
+function parseFuncType(var buf: TInputBuffer): TFuncType;
 begin
   var kind := buf.readByte;
   if kind <> $60 then
@@ -289,7 +289,7 @@ begin
     raise EWasmError.Create('function has more than one result');
 end;
 
-function parseData(const buf: TInputBuffer): TData;
+function parseData(var buf: TInputBuffer): TData;
 begin
   var memoryIndex := buf.readUint32;
   if memoryIndex <> 0 then
@@ -301,24 +301,10 @@ begin
   Result.init := buf.readBytes;
 end;
 
-function parseLocals(const buf: TInputBuffer): TLocals;
+function parseLocals(var buf: TInputBuffer): TLocals;
 begin
   Result.count := buf.readUint32;
   Result.typ := parseValType(buf);
-end;
-
-// Parses 'expr', i.e. a function's instructions residing in the code section.
-// https://webassembly.github.io/spec/core/binary/instructions.html#binary-expr
-// parameters:
-//   buf       Input buffer.
-//   funcIdx   Index of the function being parsed.
-//   locals    Vector of local type and counts for the function being parsed.
-//   module    Module that this code is part of.
-//   returns   The parsed code.
-function parseExpr(buf: TInputBuffer; funcIidx: TFuncIdx;
-  const locals: TArray<TLocals>; const module: TModule): TCode;
-begin
-
 end;
 
 {$Region 'TWasmParser'}

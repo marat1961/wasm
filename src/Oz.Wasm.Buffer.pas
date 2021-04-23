@@ -19,7 +19,7 @@ type
   PInputBuffer = ^TInputBuffer;
   TInputBuffer = record
   type
-    TParseFunc<T> = function(const buf: TInputBuffer): T;
+    TParseFunc<T> = function(var buf: TInputBuffer): T;
   private
     FBuf: PByte;
     FLast: PByte;
