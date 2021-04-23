@@ -59,8 +59,8 @@ type
     f64 = $7c);
 
   TUtils = record
-    procedure store<T>(dst: PByte; const value: T); inline;
-    procedure push<T>(var b: TBytes; const value: T); inline;
+    class procedure store<T>(dst: PByte; const value: T); static; inline;
+    class procedure push<T>(var b: TBytes; const value: T); static; inline;
   end;
 
 constructor TControlFrame.From(instr: TInstruction; typ: TOptional<TValType>;
@@ -72,12 +72,12 @@ begin
   Self.parent_stack_height := parentStackHeight;
 end;
 
-procedure TUtils.store<T>(dst: PByte; const value: T);
+class procedure TUtils.store<T>(dst: PByte; const value: T);
 begin
   Move(value, dst^, sizeof(value));
 end;
 
-procedure TUtils.push<T>(var b: TBytes; const value: T);
+class procedure TUtils.push<T>(var b: TBytes; const value: T);
 var
   storage: TBytes;
 begin
@@ -153,6 +153,81 @@ begin
     var output_type := outputs.Items[i];
     operand_stack.push(from_valtype(output_type));
   end;
+end;
+
+procedure drop_operand(
+  const frame: TControlFrame;
+  operand_stack: TStack<TOperandStackType>;
+  expected_type: TOperandStackType); overload; inline ;
+begin
+  if not frame.unreachable and
+     (Integer(operand_stack.size) < frame.parent_stack_height + 1) then
+    raise EWasmError.Create('stack underflow');
+  if Integer(operand_stack.size) = frame.parent_stack_height then
+  begin
+    Assert(frame.unreachable);  // implied from stack underflow check above
+    exit;
+  end;
+  if not type_matches(operand_stack.pop, expected_type) then
+   raise EWasmError.Create('type mismatch');
+end;
+
+procedure drop_operand(
+  const frame: TControlFrame;
+  operand_stack: TStack<TOperandStackType>;
+  expected_type: TValType); overload; inline ;
+begin
+  drop_operand(frame, operand_stack, from_valtype(expected_type));
+end;
+
+procedure update_result_stack(
+  const frame: TControlFrame;
+  operand_stack: TStack<TOperandStackType>);
+begin
+  var frame_stack_height := Integer(operand_stack.Size);
+  // This is checked by "stack underflow".
+  Assert(frame_stack_height >= frame.parent_stack_height);
+  var arity := Ord(frame.typ.hasValue);
+  if frame_stack_height > frame.parent_stack_height + arity then
+    raise EWasmError.Create('too many results');
+  if arity <> 0 then
+    drop_operand(frame, operand_stack, from_valtype(frame.typ.value));
+end;
+
+function get_branch_frame_type(const frame: TControlFrame): TOptional<TValType>; inline;
+begin
+  // For loops arity is considered always 0, because br executed in loop jumps to the top,
+  // resetting frame stack to 0, so it should not keep top stack value even if loop has a result.
+  if frame.instruction = TInstruction.loop then
+    Result.Reset
+  else
+    Result := frame.typ;
+end;
+
+function get_branch_arity(const frame: TControlFrame): Uint32; inline;
+begin
+  Result := Ord(get_branch_frame_type(frame).hasValue);
+end;
+
+procedure update_branch_stack(const current_frame, branch_frame: TControlFrame;
+  operand_stack: TStack<TOperandStackType>); inline;
+begin
+  Assert(Integer(operand_stack.Size) >= current_frame.parent_stack_height);
+  var branch_frame_type := get_branch_frame_type(branch_frame);
+  if branch_frame_type.hasValue then
+    drop_operand(current_frame, operand_stack, from_valtype(branch_frame_type.value));
+end;
+
+procedure push_branch_immediates(const branch_frame: TControlFrame;
+  stack_height: Integer; instructions: TArray<Byte>);
+begin
+  // How many stack items to drop when taking the branch.
+  var stack_drop := stack_height - branch_frame.parent_stack_height;
+
+  // Push frame start location as br immediates - these are final if frame is loop,
+  // but for block/if/else these are just placeholders, to be filled at end instruction.
+  TUtils.push<Uint32>(instructions, Uint32(branch_frame.code_offset));
+  TUtils.push<Uint32>(instructions, Uint32(stack_drop));
 end;
 
 function parseExpr(var buf: TInputBuffer; funcIidx: TFuncIdx;
