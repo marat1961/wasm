@@ -140,6 +140,7 @@ var
   size: UInt32;
 begin
   size := readLeb128;
+  // todo: correct check
   if size <= 0 then
      EWasmError.Create(EWasmError.InvalidSize);
   if FCurrent > FLast then

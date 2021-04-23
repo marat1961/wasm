@@ -45,7 +45,7 @@ var
 begin
   size := buf.readUint32;
   Assert(size < 128);
-  SetLength(result, size);
+  SetLength(Result, size);
   for var i := 0 to size - 1 do
     Result[i] := buf.readUint32;
 end;
@@ -90,14 +90,14 @@ begin
   case kind of
     $00:
       begin
-        result.min := buf.readUint32;
-        result.max.Reset;
+        Result.min := buf.readUint32;
+        Result.max.Reset;
       end;
     $01:
       begin
-        result.min := buf.readUint32;
-        result.max := TOptional<Uint32>.From(buf.readUint32);
-        if result.min > result.max.value then
+        Result.min := buf.readUint32;
+        Result.max := TOptional<Uint32>.From(buf.readUint32);
+        if Result.min > Result.max.value then
           raise EWasmError.Create('malformed limits (minimum is larger than maximum)');
       end;
     else
@@ -196,8 +196,8 @@ end;
 
 function parseImport(const buf: TInputBuffer): TImport;
 begin
-  result.module := buf.readString;
-  result.name := buf.readString;
+  Result.module := buf.readString;
+  Result.name := buf.readString;
   var kind := buf.readByte;
   case kind of
     $00:
@@ -291,12 +291,20 @@ end;
 
 function parseData(const buf: TInputBuffer): TData;
 begin
-
+  var memoryIndex := buf.readUint32;
+  if memoryIndex <> 0 then
+    raise EWasmError.CreateFmt(
+      'invalid memory index %d (only memory 0 is allowed)', [memoryIndex]);
+  // Offset expression is required to have i32 result value
+  // https://webassembly.github.io/spec/core/valid/modules.html#data-segments
+  Result.offset := parseConstantExpression(buf, TValType.i32);
+  Result.init := buf.readBytes;
 end;
 
 function parseLocals(const buf: TInputBuffer): TLocals;
 begin
-
+  Result.count := buf.readUint32;
+  Result.typ := parseValType(buf);
 end;
 
 // Parses 'expr', i.e. a function's instructions residing in the code section.
@@ -545,7 +553,7 @@ begin
       raise EWasmError.Create('too many local variables');
   end;
 
-  Assert(localCount + Length(module.typesec[module.funcsec[funcIdx]].inputs) <= Uint32.MaxValue);
+  Assert(localCount + Uint64(Length(module.typesec[module.funcsec[funcIdx]].inputs)) <= Uint32.MaxValue);
   var code := parseExpr(b, funcIdx, localsVec, module);
 
   // Size is the total bytes of locals and expressions.
