@@ -8,7 +8,7 @@ interface
 
 uses
   System.SysUtils, System.Math, TestFramework, DUnitX.TestFramework,
-  Oz.Wasm.Utils;
+  Oz.Wasm.Utils, Oz.Wasm.Value;
 
 {$Region 'TestStack'}
 
@@ -36,6 +36,14 @@ type
 type
   TestOperandStack = class(TTestCase)
   published
+    procedure Test_construct;
+    procedure Test_top;
+    procedure Test_small;
+    procedure Test_small_with_locals;
+    procedure Test_large;
+    procedure Test_large_with_locals;
+    procedure Test_rbegin_rend;
+    procedure Test_rbegin_rend_locals;
   end;
 
 {$EndRegion}
@@ -168,6 +176,233 @@ end;
 
 {$EndRegion}
 
+{$Region 'TestOperandStack'}
+
+procedure TestOperandStack.Test_construct;
+var
+  stack: TOperandStack;
+begin
+  stack := TOperandStack.From(nil, 0, 0, 0);
+  Check(stack.size = 0);
+end;
+
+procedure TestOperandStack.Test_top;
+var
+  stack: TOperandStack;
+begin
+  stack := TOperandStack.From(nil, 0, 0, 1);
+  Check(stack.size = 0);
+
+  stack.push(1);
+  Check(stack.size = 1);
+  Check(stack.top.i32 = 1);
+  Check(stack[0].i32 = 1);
+
+  stack.top.i32 := 101;
+  Check(stack.size = 1);
+  Check(stack.top.i32 =  101);
+  Check(stack[0].i32 = 101);
+
+  stack.drop(0);
+  Check(stack.size =  1);
+  Check(stack.top.i32 = 101);
+  Check(stack[0].i32 = 101);
+
+  stack.drop(1);
+  Check(stack.size = 0);
+
+  stack.push(2);
+  Check(stack.size = 1);
+  Check(stack.top.i32 = 2);
+  Check(stack[0].i32 = 2);
+end;
+
+procedure TestOperandStack.Test_small;
+var
+  stack: TOperandStack;
+begin
+  stack := TOperandStack.From(nil, 0, 0, 3);
+  Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) < 100, 'not allocated on the system stack');
+
+  Check(stack.size = 0);
+
+  stack.push(1);
+  stack.push(2);
+  stack.push(3);
+  Check(stack.size = 3);
+  Check(stack.top.i32 = 3);
+  Check(stack[0].i32 = 3);
+  Check(stack[1].i32 = 2);
+  Check(stack[2].i32 = 1);
+
+  stack[0].i32 := 13;
+  stack[1].i32 := 12;
+  stack[2].i32 := 11;
+  Check(stack.size = 3);
+  Check(stack.top.i32 = 13);
+  Check(stack[0].i32 = 13);
+  Check(stack[1].i32 = 12);
+  Check(stack[2].i32 = 11);
+
+  Check(stack.pop.i32 = 13);
+  Check(stack.size = 2);
+  Check(stack.top.i32 = 12);
+end;
+
+procedure TestOperandStack.Test_small_with_locals;
+var
+  stack: TOperandStack;
+  args: TArray<TValue>;
+begin
+  args := [TValue.From($a1), TValue.From($a2)];
+  stack := TOperandStack.From(@args[0], Length(args), 0, 3);
+  Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) < 100, 'not allocated on the system stack');
+
+  Check(stack.size = 0);
+
+  stack.push($ff);
+  Check(stack.size = 1);
+  Check(stack.top.i32 = $ff);
+  Check(stack[0].i32 = $ff);
+
+  Check(stack.local(0).i32 = $a1);
+  Check(stack.local(1).i32 = $a2);
+  Check(stack.local(2).i32 = 0);
+  Check(stack.local(3).i32 = 0);
+  Check(stack.local(4).i32 = 0);
+
+  stack.local(0).i32 := $c0;
+  stack.local(1).i32 := $c1;
+  stack.local(2).i32 := $c2;
+  stack.local(3).i32 := $c3;
+  stack.local(4).i32 := $c4;
+
+  Check(stack.local(0).i32 = $c0);
+  Check(stack.local(1).i32 = $c1);
+  Check(stack.local(2).i32 = $c2);
+  Check(stack.local(3).i32 = $c3);
+  Check(stack.local(4).i32 = $c4);
+
+  Check(stack.pop.i32 = $ff);
+  Check(stack.size = 0);
+  Check(stack.local(0).i32 = $c0);
+  Check(stack.local(1).i32 = $c1);
+  Check(stack.local(2).i32 = $c2);
+  Check(stack.local(3).i32 = $c3);
+  Check(stack.local(4).i32 = $c4);
+end;
+
+procedure TestOperandStack.Test_large;
+var
+  stack: TOperandStack;
+  i: Uint32;
+begin
+  var max_height := 33;
+  stack := TOperandStack.From(nil, 0, 0, max_height);
+  Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) < 100, 'not allocated on the system stack');
+  Check(stack.size = 0);
+
+  for i := 0 to max_height - 1 do
+    stack.push(i);
+
+  Check(stack.size = max_height);
+  var expected := max_height - 1;
+  while expected >= 0 do
+  begin
+    Check(stack.pop.i32 = expected);
+    Dec(expected);
+  end;
+  Check(stack.size = 0);
+end;
+
+procedure TestOperandStack.Test_large_with_locals;
+var
+  stack: TOperandStack;
+  args: TArray<TValue>;
+  i: Uint32;
+begin
+  args := [TValue.From($a1), TValue.From($a2)];
+
+  var max_height := 33;
+  var num_locals := 5;
+  var num_args := Length(args);
+  stack := TOperandStack.From(@args[0], num_args, num_locals, max_height);
+  Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) < 100, 'not allocated on the heap');
+
+  for i := 0 to max_height - 1 do
+    stack.push(i);
+
+  Check(stack.size = max_height);
+  for i := 0 to max_height - 1 do
+    Check(stack[i].i32 = max_height - i - 1);
+
+  Check(stack.local(0).i32 = $a1);
+  Check(stack.local(1).i32 = $a2);
+
+  for i := num_args to num_args + num_locals - 1 do
+    Check(stack.local(i).i32 = 0);
+
+  for i := 0 to num_args + num_locals - 1 do
+    stack.local(i)^ := TValue.From(i);
+  for i := 0 to num_args + num_locals - 1 do
+    Check(stack.local(i).i32 = i);
+
+  var expected := max_height - 1;
+  while expected >= 0 do
+  begin
+    Check(stack.pop.i32 = expected);
+    Dec(expected);
+  end;
+  Check(stack.size = 0);
+
+  for i := 0 to num_args + num_locals - 1 do
+    Check(stack.local(i).i32 = i);
+end;
+
+procedure TestOperandStack.Test_rbegin_rend;
+var
+  stack: TOperandStack;
+begin
+  stack := TOperandStack.From(nil, 0, 0, 3);
+  Check(stack.rbegin = stack.rend);
+
+  stack.push(1);
+  stack.push(2);
+  stack.push(3);
+  Check(PByte(stack.rbegin) < PByte(stack.rend));
+  Check(stack.rbegin.i32 = 1);
+  Check(PValue(PByte(stack.rend) - sizeof(TValue)).i32 = 3);
+end;
+
+procedure TestOperandStack.Test_rbegin_rend_locals;
+var
+  stack: TOperandStack;
+  args: TArray<TValue>;
+  i: Uint32;
+begin
+  args := [TValue.From($a1)];
+
+  stack := TOperandStack.From(@args[0], Length(args), 4, 2);
+  Check(stack.rbegin = stack.rend);
+
+  stack.push(1);
+  Check(PByte(stack.rbegin) < PByte(stack.rend));
+  Check(PByte(stack.rend) - PByte(stack.rbegin) = sizeof(TValue));
+  Check(stack.rbegin.i32 = 1);
+  Check(PValue(PByte(stack.rend) - sizeof(TValue)).i32 = 1);
+
+  stack.push(2);
+  Check(PByte(stack.rbegin) < PByte(stack.rend));
+  Check(PByte(stack.rend) - PByte(stack.rbegin) = 2);
+  Check(stack.rbegin.i32 = 1);
+  Check(PValue(PByte(stack.rbegin) + sizeof(TValue)).i32 = 2);
+  Check(PValue(PByte(stack.rend) - 1 * sizeof(TValue)).i32 = 2);
+  Check(PValue(PByte(stack.rend) - 2 * sizeof(TValue)).i32 = 1);
+end;
+
+{$EndRegion}
+
 initialization
   RegisterTest(TestStack.Suite);
+  RegisterTest(TestOperandStack.Suite);
 end.
