@@ -85,12 +85,14 @@ type
     function GetSize: Uint32; inline;
   public
     procedure Push(Item: T);
-    procedure Emplace(const Args: TArray<T>);
+    procedure Emplace(const Value: T); overload;
+    procedure Emplace(const Args: TArray<T>); overload;
     function Pop: T;
     function Top: T;
     function Empty: Boolean;
+    procedure Shrink(newSize: Uint32);
     property Size: Uint32 read GetSize;
-    property Items[Index: Integer]: T read GetItem;
+    property Items[Index: Integer]: T read GetItem; default;
   end;
 
 {$EndRegion}
@@ -99,14 +101,11 @@ type
 
   POperandStack = ^TOperandStack;
   TOperandStack = record
-  const
-    SmallStorageSize = 128 div sizeof(TValue);
   private
     FTop: PValue;
     FLocals: PValue;
     FBottom: PValue;
-    FSmallStorage: array [0 .. SmallStorageSize] of TValue;
-    FLargeStorage: TArray<TValue>;
+    FStorage: TArray<TValue>;
     function GetItem(Index: Integer): PValue;
   public
     constructor From(const args: PValue; numArgs, numLocalVariables, maxStackHeight: Uint32);
@@ -130,6 +129,8 @@ type
     function local(index: Integer): PValue;
     // Drop num items from the top of the stack.
     procedure Drop(num: Uint32);
+    // Shrink the stack to the specified number of items
+    procedure Shrink(newSize: Uint32);
     // Returns the reference to the stack item on given position from the stack top.
     // Requires index < Size.
     property Items[Index: Integer]: PValue read GetItem;
@@ -242,6 +243,11 @@ begin
   FItems := FItems + [Item];
 end;
 
+procedure TStack<T>.Emplace(const Value: T);
+begin
+  FItems := FItems + [Value];
+end;
+
 procedure TStack<T>.Emplace(const Args: TArray<T>);
 begin
   FItems := FItems + Args;
@@ -268,7 +274,7 @@ end;
 
 function TStack<T>.GetItem(Index: Integer): T;
 begin
-  Result := FItems[Index];
+  Result := FItems[Size - Index - 1];
 end;
 
 function TStack<T>.GetSize: Uint32;
@@ -276,15 +282,15 @@ begin
   Result := Uint32(Length(FItems));
 end;
 
+procedure TStack<T>.Shrink(newSize: Uint32);
+begin
+  Assert(newSize <= Size);
+  SetLength(FItems, newSize);
+end;
+
 {$EndRegion}
 
 {$Region 'TOperandStack<T>'}
-
-procedure TOperandStack.Drop(num: Uint32);
-begin
-  Assert(num <= Uint32(Size));
-  Dec(FTop, num);
-end;
 
 constructor TOperandStack.From(const args: PValue;
   numArgs, numLocalVariables, maxStackHeight: Uint32);
@@ -299,13 +305,8 @@ begin
   numLocalsAdjusted := numLocals + Uint32(Ord(numLocals = 0)); // Bump to 1 if 0.
   storageSizeRequired := numLocalsAdjusted + maxStackHeight;
 
-  if storageSizeRequired <= SmallStorageSize then
-    FLocals := @FSmallStorage[0]
-  else
-  begin
-    SetLength(FLargeStorage, storageSizeRequired);
-    FLocals := @FLargeStorage[0];
-  end;
+  SetLength(FStorage, storageSizeRequired);
+  FLocals := @FStorage[0];
 
   FBottom := PValue(PByte(FLocals) + numLocalsAdjusted);
   FTop := PValue(PByte(FBottom) - 1);
@@ -370,6 +371,18 @@ begin
   Assert(Size <> 0);
   Result := FTop^;
   Dec(FTop, sizeof(TValue));
+end;
+
+procedure TOperandStack.Drop(num: Uint32);
+begin
+  Assert(num <= Uint32(Size));
+  Dec(FTop, num);
+end;
+
+procedure TOperandStack.Shrink(newSize: Uint32);
+begin
+  Assert(newSize <= size);
+  SetLength(FStorage, newSize);
 end;
 
 {$EndRegion}
