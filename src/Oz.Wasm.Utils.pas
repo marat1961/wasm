@@ -101,11 +101,14 @@ type
 
   POperandStack = ^TOperandStack;
   TOperandStack = record
+  const
+    SmallStorageSize = 128 div sizeof(TValue);
   private
     FTop: PValue;
     FLocals: PValue;
     FBottom: PValue;
-    FStorage: TArray<TValue>;
+    FSmallStorage: array [0 .. SmallStorageSize] of TValue;
+    FLargeStorage: TArray<TValue>;
     function GetItem(Index: Integer): PValue;
   public
     constructor From(const args: PValue; numArgs, numLocalVariables, maxStackHeight: Uint32);
@@ -129,8 +132,6 @@ type
     function local(index: Integer): PValue;
     // Drop num items from the top of the stack.
     procedure Drop(num: Uint32);
-    // Shrink the stack to the specified number of items
-    procedure Shrink(newSize: Uint32);
     // Returns the reference to the stack item on given position from the stack top.
     // Requires index < Size.
     property Items[Index: Integer]: PValue read GetItem; default;
@@ -157,7 +158,7 @@ begin
     Inc(PByte(dest), sizeof(T));
     Dec(Count);
   end;
-  Result := @R;
+  Result := dest;
 end;
 
 class function TStd.Copy<T>(const First, Last; var DestFirst): PByte;
@@ -302,8 +303,13 @@ begin
   var numLocalsAdjusted := numLocals + Uint32(Ord(numLocals = 0)); // Bump to 1 if 0.
   var storageSizeRequired := numLocalsAdjusted + maxStackHeight;
 
-  SetLength(FStorage, storageSizeRequired);
-  FLocals := @FStorage[0];
+  if storageSizeRequired <= SmallStorageSize then
+    FLocals := @FSmallStorage[0]
+  else
+  begin
+    SetLength(FLargeStorage, storageSizeRequired);
+    FLocals := @FLargeStorage[0];
+  end;
 
   FBottom := FLocals;
   Inc(FBottom, numLocalsAdjusted);
@@ -323,7 +329,7 @@ function TOperandStack.GetItem(index: Integer): PValue;
 begin
   Assert(Uint32(index) < Size);
   Result := FTop;
-  Dec(Result, -index);
+  Dec(Result, index);
 end;
 
 function TOperandStack.local(index: Integer): PValue;
@@ -379,12 +385,6 @@ procedure TOperandStack.Drop(num: Uint32);
 begin
   Assert(num <= Uint32(Size));
   Dec(FTop, num);
-end;
-
-procedure TOperandStack.Shrink(newSize: Uint32);
-begin
-  Assert(newSize <= size);
-  SetLength(FStorage, newSize);
 end;
 
 {$EndRegion}

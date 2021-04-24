@@ -255,7 +255,7 @@ var
   args: TArray<TValue>;
 begin
   args := [TValue.From($a1), TValue.From($a2)];
-  stack := TOperandStack.From(@args[0], Length(args), 0, 3);
+  stack := TOperandStack.From(@args[0], Length(args), 3, 1);
   Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) < 100, 'not allocated on the system stack');
 
   Check(stack.size = 0);
