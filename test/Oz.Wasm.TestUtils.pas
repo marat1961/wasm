@@ -299,7 +299,7 @@ var
 begin
   var max_height := 33;
   stack := TOperandStack.From(nil, 0, 0, max_height);
-  Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) < 100, 'not allocated on the system stack');
+  Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) > 100, 'not allocated on the heap"');
   Check(stack.size = 0);
 
   for i := 0 to max_height - 1 do
@@ -327,7 +327,7 @@ begin
   var num_locals := 5;
   var num_args := Length(args);
   stack := TOperandStack.From(@args[0], num_args, num_locals, max_height);
-  Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) < 100, 'not allocated on the heap');
+  Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) > 100, 'not allocated on the heap');
 
   for i := 0 to max_height - 1 do
     stack.push(i);
@@ -393,10 +393,10 @@ begin
 
   stack.push(2);
   Check(PByte(stack.rbegin) < PByte(stack.rend));
-  Check(PByte(stack.rend) - PByte(stack.rbegin) = 2);
+  Check(PByte(stack.rend) - PByte(stack.rbegin) = 2 * sizeof(TValue));
   Check(stack.rbegin.i32 = 1);
   Check(PValue(PByte(stack.rbegin) + sizeof(TValue)).i32 = 2);
-  Check(PValue(PByte(stack.rend) - 1 * sizeof(TValue)).i32 = 2);
+  Check(PValue(PByte(stack.rend) - 1 * sizeof(TValue)).i32 = 2 );
   Check(PValue(PByte(stack.rend) - 2 * sizeof(TValue)).i32 = 1);
 end;
 
