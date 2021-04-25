@@ -220,16 +220,21 @@ function TInputBuffer.readLeb32s: Int32;
 var
   b: ShortInt;
   shift: Integer;
+  r: UInt32;
 begin
   shift := 0;
-  Result := 0;
+  r := 0;
   repeat
     if shift >= sizeof(Int32) * 8 then
       raise EWasmError.Create(EWasmError.MalformedVarint);
     b := readByte;
-    Result := Result or ((b and $7f) shl shift);
+    r := r or ((b and $7f) shl shift);
     Inc(shift, 7);
   until b >= 0;
+  // sign extend
+  if (shift < sizeof(Int32) * 8) and (b and $40 <> 0) then
+    r := r or (UInt32.MaxValue shl shift);
+  Result := r;
 end;
 
 function TInputBuffer.readLeb32u: Uint32;
