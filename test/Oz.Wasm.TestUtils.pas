@@ -30,7 +30,6 @@ type
 
 {$Region 'TestOperandStack'}
 
-type
   TestOperandStack = class(TTestCase)
   published
     procedure Test_construct;

@@ -19,7 +19,8 @@ uses
   Oz.Wasm.Parser in '..\src\Oz.Wasm.Parser.pas',
   Oz.Wasm.Buffer in '..\src\Oz.Wasm.Buffer.pas',
   Oz.Wasm.ParseExpression in '..\src\Oz.Wasm.ParseExpression.pas',
-  Oz.Wasm.TestUtils in 'Oz.Wasm.TestUtils.pas';
+  Oz.Wasm.TestUtils in 'Oz.Wasm.TestUtils.pas',
+  Oz.Wasm.TestBuffer in 'Oz.Wasm.TestBuffer.pas';
 
 {$R *.RES}
 
