@@ -113,15 +113,15 @@ begin
   stack.push('b');
   stack.push('c');
   stack.push('d');
-  Check(stack.top = 'd');
+  Check(stack.top^ = 'd');
   Check(stack.size = 4);
 
   stack.shrink(4);
-  Check(stack.top = 'd');
+  Check(stack.top^ = 'd');
   Check(stack.size = 4);
 
   stack.shrink(2);
-  Check(stack.top = 'b');
+  Check(stack.top^ = 'b');
   Check(stack.size = 2);
 
   stack.shrink(0);
@@ -149,7 +149,7 @@ begin
   Check(stack[1].a = 'd');
   Check(stack[1].b = 'e');
   Check(stack[1].c = 'f');
-  item := stack[2];
+  item := stack[2]^;
   Check(stack[2].a = 'a');
   Check(stack[2].b = 'b');
   Check(stack[2].c = 'c');
@@ -368,7 +368,6 @@ procedure TestOperandStack.Test_rbegin_rend_locals;
 var
   stack: TOperandStack;
   args: TArray<TValue>;
-  i: Uint32;
 begin
   args := [TValue.From($a1)];
 

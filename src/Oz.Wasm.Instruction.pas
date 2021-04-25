@@ -25,7 +25,7 @@ type
     br = $0C,                  // 'br'
     br_if = $0D,               // 'br_if'
     br_table = $0E,            // 'br_table'
-    return_ = $0F,             // 'return'
+    return = $0F,              // 'return'
     call = $10,                // 'call'
     call_indirect = $11,       // 'call_indirect'
     res13 = $13, res14 = $14, res15 = $15, res16 = $16, res17 = $17, res18 = $18,
@@ -254,8 +254,8 @@ const
     (* nop                 = $01 *) (),
     (* block               = $02 *) (),
     (* loop                = $03 *) (),
-    (* if_                 = $04 *) (inputs: (TValType.i32, TValType.none)),
-    (* else_               = $05 *) (),
+    (* if                  = $04 *) (inputs: (TValType.i32, TValType.none)),
+    (* else                = $05 *) (),
     (*                       $06 *) (),
     (*                       $07 *) (),
     (*                       $08 *) (),
@@ -265,7 +265,7 @@ const
     (* br                  = $0c *) (),
     (* br_if               = $0d *) (inputs: (TValType.i32, TValType.none)),
     (* br_table            = $0e *) (inputs: (TValType.i32, TValType.none)),
-    (* return_             = $0f *) (),
+    (* return              = $0f *) (),
 
     (* call                = $10 *) (),
     (* call_indirect       = $11 *) (inputs: (TValType.i32, TValType.none)),
@@ -477,8 +477,8 @@ const
     (* nop                 = $01 *) 0,
     (* block               = $02 *) 0,
     (* loop                = $03 *) 0,
-    (* if_                 = $04 *) 0,
-    (* else_               = $05 *) 0,
+    (* if                  = $04 *) 0,
+    (* else                = $05 *) 0,
     (*                       $06 *) 0,
     (*                       $07 *) 0,
     (*                       $08 *) 0,
@@ -488,7 +488,7 @@ const
     (* br                  = $0c *) 0,
     (* br_if               = $0d *) 0,
     (* br_table            = $0e *) 0,
-    (* return_             = $0f *) 0,
+    (* return              = $0f *) 0,
     (* call                = $10 *) 0,
     (* call_indirect       = $11 *) 0,
 

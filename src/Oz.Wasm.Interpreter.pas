@@ -271,7 +271,7 @@ begin
           if pc = @code.instructions[Length(code.instructions)] then
             goto ends;
         end;
-      TInstruction.br, TInstruction.br_if, TInstruction.return_:
+      TInstruction.br, TInstruction.br_if, TInstruction.return:
         begin
           var arity := pc.read<Uint32>;
           // Check condition for br_if.

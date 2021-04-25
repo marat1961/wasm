@@ -44,6 +44,12 @@ type
     function readArray<T>(parse: TParseFunc<T>): TArray<T>;
     // Read an Uint32 value
     function readUint32: Uint32; inline;
+    // Read an Int32 value
+    function readInt32: Int32; inline;
+    // Read an Uint64 value
+    function readUint64: Uint64; inline;
+    // Read an Int64 value
+    function readInt64: Int64; inline;
     // Read a string value
     function readString: string;
     // Read a string value
@@ -196,6 +202,21 @@ end;
 function TInputBuffer.readUint32: Uint32;
 begin
   Result := readLeb128;
+end;
+
+function TInputBuffer.readInt32: Int32;
+begin
+  Result := 0;
+end;
+
+function TInputBuffer.readInt64: Int64;
+begin
+  Result := 0;
+end;
+
+function TInputBuffer.readUint64: Uint64;
+begin
+  Result := 0;
 end;
 
 function TInputBuffer.readString: string;
