@@ -82,31 +82,26 @@ function ToHex(const bytes: TBytes): AnsiString;
 implementation
 
 function FromHex(const hex: AnsiString): TBytes;
-var
-  b, v: Integer;
-begin
-  var L := Length(hex);
-  if Odd(L) then
-    raise EWasmError.Create('the length of the input is odd');
-  SetLength(Result, L div 2);
-  var j := 0;
-  for var i := 0 to L - 1 do
+
+  function GetHex(var p: PAnsiChar): Integer;
   begin
-    var c := hex[i];
-    case c of
-      '0'..'9': v := Ord(c) - Ord('0');
-      'a'..'f': v := Ord(c) - Ord('a') + 10;
-      'A'..'F': v := Ord(c) - Ord('A') + 10;
+    case p^ of
+      '0'..'9': Result := Ord(p^) - Ord('0');
+      'a'..'f': Result := Ord(p^) - Ord('a') + 10;
+      'A'..'F': Result := Ord(p^) - Ord('A') + 10;
       else raise EWasmError.Create('not a hex digit');
     end;
-    if i mod 2 = 0 then
-      b := v shl 4
-    else
-    begin
-      Result[j] := b + v;
-      Inc(j);
-    end;
+    Inc(p);
   end;
+
+begin
+  var n := Length(hex);
+  if Odd(n) then raise EWasmError.Create('the length of the input is odd');
+  n := n div 2;
+  SetLength(Result, n);
+  var p := PAnsiChar(hex);
+  for var i := 0 to n - 1 do
+    Result[i] := GetHex(p) * 16 + GetHex();
 end;
 
 function ToHex(const bytes: TBytes): AnsiString;

@@ -47,7 +47,15 @@ const
     (d: '80808080808080808001'; r: $8000000000000000),
     (d: 'ffffffffffffffffff01'; r: 9223372036854775807));
 begin
-
+  for var i := 0 to High(tests) do
+  begin
+    var bytes := FromHex(tests[i].d);
+    var buf := TInputBuffer.From(bytes);
+    var v := buf.readUint64;
+    Check(v = tests[i].r);
+    Check(buf.current = buf.begins + buf.bufferSize);
+    Check(buf.current = buf.begins + buf.bufferSize);
+  end;
 end;
 
 {$EndRegion}
