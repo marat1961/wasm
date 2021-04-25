@@ -76,7 +76,54 @@ type
 
 {$EndRegion}
 
+function FromHex(const hex: AnsiString): TBytes;
+function ToHex(const bytes: TBytes): AnsiString;
+
 implementation
+
+function FromHex(const hex: AnsiString): TBytes;
+var
+  b, v: Integer;
+begin
+  var L := Length(hex);
+  if Odd(L) then
+    raise EWasmError.Create('the length of the input is odd');
+  SetLength(Result, L div 2);
+  var j := 0;
+  for var i := 0 to L - 1 do
+  begin
+    var c := hex[i];
+    case c of
+      '0'..'9': v := Ord(c) - Ord('0');
+      'a'..'f': v := Ord(c) - Ord('a') + 10;
+      'A'..'F': v := Ord(c) - Ord('A') + 10;
+      else raise EWasmError.Create('not a hex digit');
+    end;
+    if i mod 2 = 0 then
+      b := v shl 4
+    else
+    begin
+      Result[j] := b + v;
+      Inc(j);
+    end;
+  end;
+end;
+
+function ToHex(const bytes: TBytes): AnsiString;
+const
+  HEX: AnsiString = '0123456789abcdef';
+begin
+  SetLength(Result, Length(bytes) * 2);
+  var j := 0;
+  for var i := 0 to High(bytes) do
+  begin
+    var b := bytes[i];
+    Result[j] := HEX[b and $F];
+    Inc(j);
+    Result[j] := HEX[b and $F0 shr 4];
+    Inc(j);
+  end;
+end;
 
 {$Region 'TInputBuffer'}
 
@@ -125,7 +172,7 @@ end;
 procedure TInputBuffer.checkUnread(size: Integer);
 begin
   if UnreadSize < size then
-    EWasmError.Create(EWasmError.EofEncounterd);
+    raise EWasmError.Create(EWasmError.EofEncounterd);
 end;
 
 function TInputBuffer.Eof: Boolean;
@@ -136,7 +183,7 @@ end;
 function TInputBuffer.readByte: Byte;
 begin
   if FCurrent > FLast then
-    EWasmError.Create(EWasmError.EofEncounterd);
+    raise EWasmError.Create(EWasmError.EofEncounterd);
   Result := ShortInt(FCurrent^);
   Inc(FCurrent);
 end;
@@ -148,9 +195,9 @@ begin
   size := readLeb128;
   // todo: correct check
   if size <= 0 then
-     EWasmError.Create(EWasmError.InvalidSize);
+     raise EWasmError.Create(EWasmError.InvalidSize);
   if FCurrent > FLast then
-    EWasmError.Create(EWasmError.EofEncounterd);
+    raise EWasmError.Create(EWasmError.EofEncounterd);
   SetLength(Result, size);
   Move(FCurrent^, Pointer(Result)^, size);
   Inc(FCurrent, size);
