@@ -20,6 +20,8 @@ type
     NotImplemented = 0;
     EofEncounterd = 1;
     InvalidSize = 2;
+    MalformedVarint = 3;
+    TooManyBytes = 4;
   public
     constructor Create(ErrNo: Integer); overload;
   end;
@@ -60,6 +62,8 @@ begin
     NotImplemented: Msg := 'not implemented';
     EofEncounterd: Msg := 'eof encounterd';
     InvalidSize: Msg := 'invalid size';
+    MalformedVarint: Msg := 'invalid LEB128 encoding: unused bits set''';
+    TooManyBytes: Msg := 'invalid LEB128 encoding: too many bytes';
     else Msg := 'Error: ' + IntToStr(ErrNo);
   end;
   Create(Msg);

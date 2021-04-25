@@ -471,7 +471,7 @@ begin
   begin
     // Offset is validated to be i32, but it's used in 64-bit calculation below.
     var offset: Uint64 := evalConstantExpression(data.offset, importedGlobals, globals).i32;
-    if offset + Length(data.init) > Length(memory) then
+    if offset + Uint64(Length(data.init)) > Length(memory) then
       raise EWasmError.Create('data segment is out of memory bounds');
     datasecOffsets := datasecOffsets + [offset];
   end;
@@ -483,7 +483,7 @@ begin
   begin
     // Offset is validated to be i32, but it's used in 64-bit calculation below.
     var offset: Uint64 := evalConstantExpression(element.offset, importedGlobals, globals).i32;
-    if offset + Length(element.init) > Length(table) then
+    if offset + Uint64(Length(element.init)) > Length(table) then
       raise EWasmError.Create('element segment is out of table bounds');
     elementsecOffsets := elementsecOffsets + [offset];
   end;

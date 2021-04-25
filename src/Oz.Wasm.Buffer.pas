@@ -42,20 +42,20 @@ type
     function readValue<T>: T;
     // read array of value
     function readArray<T>(parse: TParseFunc<T>): TArray<T>;
-    // Read an Uint32 value
-    function readUint32: Uint32; inline;
-    // Read an Int32 value
+    // Decode signed/unsigned integer. Little Endian Base 128 code compression.
+    function readLeb32s: Int32;
+    function readLeb32u: Uint32;
+    function readLeb64s: Int64;
+    function readLeb64u: Uint64;
+    // Read an Int32/Uint32/Int64/Uint64 value
     function readInt32: Int32; inline;
-    // Read an Uint64 value
+    function readUint32: Uint32; inline;
     function readUint64: Uint64; inline;
-    // Read an Int64 value
     function readInt64: Int64; inline;
     // Read a string value
     function readString: string;
     // Read a string value
     function readUTF8String: System.UTF8String;
-    // Decode unsigned integer. Little Endian Base 128 code compression.
-    function readLeb128: Uint32;
     // Returns whether bytes start at the current position with the given bytes.
     function startsWith(const bytes: TBytesView): Boolean;
     // Skip size bytes
@@ -101,7 +101,7 @@ begin
   SetLength(Result, n);
   var p := PAnsiChar(hex);
   for var i := 0 to n - 1 do
-    Result[i] := GetHex(p) * 16 + GetHex();
+    Result[i] := GetHex(p) * 16 + GetHex(p);
 end;
 
 function ToHex(const bytes: TBytes): AnsiString;
@@ -187,7 +187,7 @@ function TInputBuffer.readBytes: TBytes;
 var
   size: UInt32;
 begin
-  size := readLeb128;
+  size := readLeb32u;
   // todo: correct check
   if size <= 0 then
      raise EWasmError.Create(EWasmError.InvalidSize);
@@ -216,9 +216,23 @@ begin
     Result[i] := parse(Self);
 end;
 
-function TInputBuffer.readLeb128: Uint32;
-const
-  size = sizeof(Uint32);
+function TInputBuffer.readLeb32s: Int32;
+var
+  b: ShortInt;
+  shift: Integer;
+begin
+  shift := 0;
+  Result := 0;
+  repeat
+    if shift >= sizeof(Int32) * 8 then
+      raise EWasmError.Create(EWasmError.MalformedVarint);
+    b := readByte;
+    Result := Result or ((b and $7f) shl shift);
+    Inc(shift, 7);
+  until b >= 0;
+end;
+
+function TInputBuffer.readLeb32u: Uint32;
 var
   shift: Integer;
   r: Uint32;
@@ -226,39 +240,81 @@ var
 begin
   r := 0;
   shift := 0;
-  while shift < size * 8 do
+  while shift < sizeof(Uint32) * 8 do
   begin
     b := readByte;
-    r := r or Uint32((b and $7F) shl shift);
+    r := r or (Uint32(b and $7F) shl shift);
     if b and $80 = 0 then
     begin
-      if b <> (r shr shift) then
-        raise EWasmError.Create('invalid LEB128 encoding: unused bits set');
+      if b <> r shr shift then
+        raise EWasmError.Create(EWasmError.MalformedVarint);
       exit(r);
     end;
     shift := shift + 7;
   end;
-  raise EWasmError.Create('invalid LEB128 encoding: too many bytes');
+  raise EWasmError.Create(EWasmError.TooManyBytes);
 end;
 
-function TInputBuffer.readUint32: Uint32;
+function TInputBuffer.readLeb64s: Int64;
+var
+  b: ShortInt;
+  shift: Integer;
+  i64: Int64;
 begin
-  Result := readLeb128;
+  shift := -7;
+  Result := 0;
+  repeat
+    Inc(shift, 7);
+    if shift >= 64 then
+      EWasmError.Create(EWasmError.MalformedVarint);
+    b := readByte;
+    i64 := b and $7f;
+    i64 := i64 shl shift;
+    Result := Result or i64;
+  until b >= 0;
+end;
+
+function TInputBuffer.readLeb64u: Uint64;
+var
+  shift: Integer;
+  r: Uint64;
+  b: Byte;
+begin
+  r := 0;
+  shift := 0;
+  while shift < sizeof(Uint64) * 8 do
+  begin
+    b := readByte;
+    r := r or (Uint64(b and $7F) shl shift);
+    if b and $80 = 0 then
+    begin
+      if b <> r shr shift then
+        raise EWasmError.Create(EWasmError.MalformedVarint);
+      exit(r);
+    end;
+    shift := shift + 7;
+  end;
+  raise EWasmError.Create(EWasmError.TooManyBytes);
 end;
 
 function TInputBuffer.readInt32: Int32;
 begin
-  Result := 0;
+  Result := readLeb32s;
+end;
+
+function TInputBuffer.readUint32: Uint32;
+begin
+  Result := readLeb32u;
 end;
 
 function TInputBuffer.readInt64: Int64;
 begin
-  Result := 0;
+  Result := readLeb64s;
 end;
 
 function TInputBuffer.readUint64: Uint64;
 begin
-  Result := 0;
+  Result := readLeb64u;
 end;
 
 function TInputBuffer.readString: string;

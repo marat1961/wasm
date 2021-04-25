@@ -45,14 +45,16 @@ const
     (d: 'ffffffffffffff808000'; r: 562949953421311),    // bigger than int32 with zeroes
     (d: 'ffffffffffffffff7f'; r: $7fffffffffffffff),
     (d: '80808080808080808001'; r: $8000000000000000),
-    (d: 'ffffffffffffffffff01'; r: 9223372036854775807));
+    (d: 'ffffffffffffffffff01'; r: Uint64.MaxValue));
 begin
   for var i := 0 to High(tests) do
   begin
-    var bytes := FromHex(tests[i].d);
+    var hex := tests[i].d;
+    var bytes := FromHex(hex);
     var buf := TInputBuffer.From(bytes);
     var v := buf.readUint64;
-    Check(v = tests[i].r);
+    var expected := tests[i].r;
+    Check(v = expected);
     Check(buf.current = buf.begins + buf.bufferSize);
     Check(buf.current = buf.begins + buf.bufferSize);
   end;
