@@ -14,9 +14,6 @@ uses
 
 type
   TestStack = class(TTestCase)
-  public
-    procedure SetUp; override;
-    procedure TearDown; override;
   published
     procedure Test_push_pop;
     procedure Test_emplace;
@@ -44,6 +41,7 @@ type
     procedure Test_large_with_locals;
     procedure Test_rbegin_rend;
     procedure Test_rbegin_rend_locals;
+    procedure Test_hidden_stack_item;
   end;
 
 {$EndRegion}
@@ -62,14 +60,6 @@ end;
 {$EndRegion}
 
 {$Region 'TestStack'}
-
-procedure TestStack.SetUp;
-begin
-end;
-
-procedure TestStack.TearDown;
-begin
-end;
 
 procedure TestStack.Test_push_pop;
 var
@@ -297,16 +287,16 @@ var
   stack: TOperandStack;
   i: Uint32;
 begin
-  var max_height := 33;
-  stack := TOperandStack.From(nil, 0, 0, max_height);
+  var maxHeight := 33;
+  stack := TOperandStack.From(nil, 0, 0, maxHeight);
   Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) > 100, 'not allocated on the heap"');
   Check(stack.size = 0);
 
-  for i := 0 to max_height - 1 do
+  for i := 0 to maxHeight - 1 do
     stack.push(i);
 
-  Check(stack.size = max_height);
-  var expected := max_height - 1;
+  Check(stack.size = maxHeight);
+  var expected := maxHeight - 1;
   while expected >= 0 do
   begin
     Check(stack.pop.i32 = expected);
@@ -323,31 +313,31 @@ var
 begin
   args := [TValue.From($a1), TValue.From($a2)];
 
-  var max_height := 33;
-  var num_locals := 5;
-  var num_args := Length(args);
-  stack := TOperandStack.From(@args[0], num_args, num_locals, max_height);
+  var maxHeight := 33;
+  var numLocals := 5;
+  var numArgs := Length(args);
+  stack := TOperandStack.From(@args[0], numArgs, numLocals, maxHeight);
   Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) > 100, 'not allocated on the heap');
 
-  for i := 0 to max_height - 1 do
+  for i := 0 to maxHeight - 1 do
     stack.push(i);
 
-  Check(stack.size = max_height);
-  for i := 0 to max_height - 1 do
-    Check(stack[i].i32 = max_height - i - 1);
+  Check(stack.size = maxHeight);
+  for i := 0 to maxHeight - 1 do
+    Check(stack[i].i32 = maxHeight - i - 1);
 
   Check(stack.local(0).i32 = $a1);
   Check(stack.local(1).i32 = $a2);
 
-  for i := num_args to num_args + num_locals - 1 do
+  for i := numArgs to numArgs + numLocals - 1 do
     Check(stack.local(i).i32 = 0);
 
-  for i := 0 to num_args + num_locals - 1 do
+  for i := 0 to numArgs + numLocals - 1 do
     stack.local(i)^ := TValue.From(i);
-  for i := 0 to num_args + num_locals - 1 do
+  for i := 0 to numArgs + numLocals - 1 do
     Check(stack.local(i).i32 = i);
 
-  var expected := max_height - 1;
+  var expected := maxHeight - 1;
   while expected >= 0 do
   begin
     Check(stack.pop.i32 = expected);
@@ -355,7 +345,7 @@ begin
   end;
   Check(stack.size = 0);
 
-  for i := 0 to num_args + num_locals - 1 do
+  for i := 0 to numArgs + numLocals - 1 do
     Check(stack.local(i).i32 = i);
 end;
 
@@ -398,6 +388,22 @@ begin
   Check(PValue(PByte(stack.rbegin) + sizeof(TValue)).i32 = 2);
   Check(PValue(PByte(stack.rend) - 1 * sizeof(TValue)).i32 = 2 );
   Check(PValue(PByte(stack.rend) - 2 * sizeof(TValue)).i32 = 1);
+end;
+
+procedure TestOperandStack.Test_hidden_stack_item;
+var
+  stack: TOperandStack;
+begin
+  var maxHeight := 33;
+  stack := TOperandStack.From(nil, 0, 0, maxHeight);
+  Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) > 100, 'not allocated on the heap');
+  Check(stack.size = 0);
+  Check(stack.rbegin = stack.rend);
+
+  // Even when stack is empty, there exists a single hidden item slot.
+  stack.rbegin.i64 := 1;
+  Check(stack.rbegin.i64 = 1);
+  Check(stack.rend.i64 = 1);
 end;
 
 {$EndRegion}

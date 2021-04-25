@@ -30,10 +30,13 @@ type
 {$Region 'TOptional<T>: optional value'}
 
   TOptional<T> = record
+  var
     value: T;
     hasValue: Boolean;
+  public
     constructor From(value: T);
     procedure Reset;
+    function Equals(const other: TOptional<T>): Boolean;
   end;
 
 {$EndRegion}
@@ -79,20 +82,22 @@ type
 {$Region 'TStack<T>'}
 
   TStack<T> = record
+  type
+    Pt = ^T;
   strict private
     FItems: TArray<T>;
-    function GetItem(Index: Integer): T; inline;
+    function GetItem(Index: Integer): Pt; inline;
     function GetSize: Uint32; inline;
   public
     procedure Push(Item: T);
     procedure Emplace(const Value: T); overload;
     procedure Emplace(const Args: TArray<T>); overload;
     function Pop: T;
-    function Top: T;
+    function Top: Pt;
     function Empty: Boolean;
     procedure Shrink(newSize: Uint32);
     property Size: Uint32 read GetSize;
-    property Items[Index: Integer]: T read GetItem; default;
+    property Items[Index: Integer]: Pt read GetItem; default;
   end;
 
 {$EndRegion}
@@ -200,6 +205,13 @@ begin
   Self := Default(TOptional<T>);
 end;
 
+function TOptional<T>.Equals(const other: TOptional<T>): Boolean;
+begin
+  Result := hasValue = other.hasValue;
+  if Result then
+    Result := Self.Equals(other);
+end;
+
 {$EndRegion}
 
 {$Region 'TSpan<T>'}
@@ -263,9 +275,9 @@ begin
   SetLength(FItems, Len);
 end;
 
-function TStack<T>.Top: T;
+function TStack<T>.Top: Pt;
 begin
-  Result := FItems[High(FItems)];
+  Result := @FItems[High(FItems)];
 end;
 
 function TStack<T>.Empty: Boolean;
@@ -273,9 +285,9 @@ begin
   Result := FItems = nil;
 end;
 
-function TStack<T>.GetItem(Index: Integer): T;
+function TStack<T>.GetItem(Index: Integer): Pt;
 begin
-  Result := FItems[Integer(Size) - Index - 1];
+  Result := @FItems[Integer(Size) - Index - 1];
 end;
 
 function TStack<T>.GetSize: Uint32;

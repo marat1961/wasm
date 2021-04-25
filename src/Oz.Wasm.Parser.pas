@@ -39,17 +39,6 @@ type
 
 implementation
 
-function parseVec32(var buf: TInputBuffer): TArray<Uint32>;
-var
-  size: UInt32;
-begin
-  size := buf.readUint32;
-  Assert(size < 128);
-  SetLength(Result, size);
-  for var i := 0 to size - 1 do
-    Result[i] := buf.readUint32;
-end;
-
 // Parses a string and validates it against UTF-8 encoding rules
 function parseString(var buf: TInputBuffer): System.UTF8String;
 begin

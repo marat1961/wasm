@@ -223,7 +223,7 @@ function getInstructionTypeTable: PInstructionTypeTable;
 // acceptable alignment value satisfying '2 ** max_align < memory_width'
 // where memory_width is the number of bytes the instruction operates on.
 // It may contain invalid value for instructions not needing it.
-function get_instruction_max_align_table: PInstructionMaxAlignTable;
+function getInstructionMaxAlignTable: PInstructionMaxAlignTable;
 
 {$EndRegion}
 
@@ -696,9 +696,9 @@ begin
   Result := @InstructionTypes;
 end;
 
-function get_instruction_max_align_table: PInstructionMaxAlignTable;
+function getInstructionMaxAlignTable: PInstructionMaxAlignTable;
 begin
-  Result := 0;
+  Result := @InstructionMaxAlign;
 end;
 
 {$EndRegion}
