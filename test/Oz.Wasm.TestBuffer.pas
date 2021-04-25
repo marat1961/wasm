@@ -15,6 +15,9 @@ uses
 type
   TestLeb128 = class(TTestCase)
   published
+    procedure Test_decode_s32;
+    procedure Test_decode_u32;
+    procedure Test_decode_s64;
     procedure Test_decode_u64;
   end;
 
@@ -23,6 +26,85 @@ type
 implementation
 
 {$Region 'TestLeb128'}
+
+procedure TestLeb128.Test_decode_s32;
+type
+  TestPair = record
+    d: AnsiString;
+    r: Int32;
+  end;
+const
+  tests: array [0..15] of TestPair = (
+    (d: '00'; r: 0),               // 0
+    (d: '808000'; r: 0),           // 0 with leading zeroes
+    (d: '01'; r: 1),               //
+    (d: '81808000'; r: 1),         // 1 with leading zeroes
+    (d: '8180808000'; r: 1),       // 1 with max leading zeroes
+    (d: '7f'; r: -1),              //
+    (d: 'ffffffff7f'; r: -1),      // -1 with leading 1s
+    (d: '7e'; r: -2),              //
+    (d: 'fe7f'; r: -2),            // -2 with leading 1s
+    (d: 'feff7f'; r: -2),          // -2 with leading 1s
+    (d: 'e58e26'; r: 624485),      //
+    (d: 'e58ea68000'; r: 624485),  // 624485 with leading zeroes
+    (d: 'c0bb78'; r: -123456),
+    (d: '9bf159'; r: -624485),
+    (d: '8180808078'; r: -2147483647),
+    (d: '8080808078'; r: Int32.MinValue));
+begin
+
+end;
+
+procedure TestLeb128.Test_decode_u32;
+type
+  TestPair = record
+    d: AnsiString;
+    r: Uint32;
+  end;
+const
+  tests: array [0..10] of TestPair = (
+    (d: '00'; r: 0),                        // 0
+    (d: '808000'; r: 0),                    // 0 with leading zeroes
+    (d: '01'; r: 1),                        // 1
+    (d: '81808000'; r: 1),                  // 1 with leading zeroes
+    (d: '8180808000'; r: 1),                // 1 with max leading zeroes
+    (d: '8200'; r: 2),                      // 2 with leading zeroes
+    (d: 'e58e26'; r: 624485),               // 624485
+    (d: 'e58ea68000'; r: 624485),           // 624485 with leading zeroes
+    (d: 'ffffffff07'; r: $7fffffff),
+    (d: '8080808008'; r: $80000000),
+    (d: 'ffffffff0f'; r: Uint32.MaxValue)); // max
+begin
+
+end;
+
+procedure TestLeb128.Test_decode_s64;
+type
+  TestPair = record
+    d: AnsiString;
+    r: Int32;
+  end;
+const
+  tests: array [0..15] of TestPair = (
+    (d: '00'; r: 0),                                  // 0
+    (d: '808000'; r: 0),                              // 0 with leading zeroes
+    (d: '01'; r: 1),                                  //
+    (d: '81808000'; r: 1),                            // 1 with leading zeroes
+    (d: '81808080808080808000'; r: 1),                // 1 with max leading zeroes
+    (d: '7f'; r: -1),                                 //
+    (d: 'ffffffffffffffffff7f'; r: -1),               // -1 with leading 1s
+    (d: '7e'; r: -2),                                 //
+    (d: 'fe7f'; r: -2),                               // -2 with leading 1s
+    (d: 'feff7f'; r: -2),                             // -2 with leading 1s
+    (d: 'e58e26'; r: 624485),                         //
+    (d: 'e58ea6808000'; r: 624485),                   // 624485 with leading zeroes
+    (d: 'c0bb78'; r: -123456),                        //
+    (d: '9bf159'; r: -624485),                        //
+    (d: 'ffffffffffffff00'; r: 562949953421311),      // bigger than int32
+    (d: 'ffffffffffffff808000'; r: 562949953421311)); // bigger than int32 with zeroes
+begin
+
+end;
 
 procedure TestLeb128.Test_decode_u64;
 type
