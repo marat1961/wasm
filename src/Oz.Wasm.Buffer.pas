@@ -7,7 +7,7 @@ unit Oz.Wasm.Buffer;
 interface
 
 uses
-  System.SysUtils, Oz.Wasm.Value, Oz.Wasm.Utils;
+  System.SysUtils, System.Math, Oz.Wasm.Value, Oz.Wasm.Utils;
 
 {$T+}
 {$SCOPEDENUMS ON}
@@ -80,6 +80,16 @@ function FromHex(const hex: AnsiString): TBytes;
 function ToHex(const bytes: TBytes): AnsiString;
 
 implementation
+
+function Ash32(value, shift: Integer): Integer;
+asm
+  mov eax, value
+  mov ecx, shift
+  sar eax, cl
+  mov result, eax
+end;
+//  result := (value and Int32.MaxValue) shr shift -
+//            (value and (not Int32.MaxValue)) shr shift;
 
 function FromHex(const hex: AnsiString): TBytes;
 
@@ -219,22 +229,34 @@ end;
 function TInputBuffer.readLeb32s: Int32;
 var
   shift: Integer;
-  b: ShortInt;
-  r: UInt32;
+  b, expected: Byte;
+  r: Uint32;
 begin
   shift := 0;
   r := 0;
-  repeat
-    if shift >= sizeof(Int32) * 8 then
-      raise EWasmError.Create(EWasmError.MalformedVarint);
+  while shift < 32 do
+  begin
     b := readByte;
-    r := r or (UInt32(b and $7f) shl shift);
+    r := r or (Uint32(b and $7f) shl shift);
+    if b and $80 = 0 then
+    begin
+      if shift + 7 < 32 then
+      begin
+        if b and $40 <> 0 then
+          // sign extend
+          r := r or (UInt32.MaxValue shl (shift + 7));
+      end
+      else
+      begin
+        expected := Ash32(r, shift);
+        if expected and $7F <> b then
+          raise EWasmError.Create(EWasmError.MalformedVarint);
+      end;
+      exit(r);
+    end;
     Inc(shift, 7);
-  until b >= 0;
-  // sign extend
-  if (shift < sizeof(Int32) * 8) and (b and $40 <> 0) then
-    r := r or (UInt32.MaxValue shl shift);
-  Result := r;
+  end;
+  raise EWasmError.Create(EWasmError.TooManyBytes);
 end;
 
 function TInputBuffer.readLeb32u: Uint32;
@@ -249,7 +271,7 @@ begin
   begin
     b := readByte;
     r := r or (Uint32(b and $7F) shl shift);
-    if (b and $80 = 0) then
+    if b and $80 = 0 then
     begin
       if r shr shift <> b then
         raise EWasmError.Create(EWasmError.MalformedVarint);
@@ -293,7 +315,7 @@ begin
   begin
     b := readByte;
     r := r or (Uint64(b and $7F) shl shift);
-    if (b and $80 = 0) then
+    if b and $80 = 0 then
     begin
       if r shr shift <> b then
         raise EWasmError.Create(EWasmError.MalformedVarint);

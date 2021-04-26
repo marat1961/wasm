@@ -16,6 +16,10 @@ type
   TestLeb128 = class(TTestCase)
   published
     procedure Test_decode_s32;
+    procedure Test_decode_s32_inv1;
+    procedure Test_decode_s32_inv2;
+    procedure Test_decode_s32_inv3;
+    procedure Test_decode_s32_inv4;
 
     procedure Test_decode_u32;
     procedure Test_decode_u32_inv1;
@@ -26,6 +30,10 @@ type
     procedure Test_decode_u32_inv6;
 
     procedure Test_decode_s64;
+    procedure Test_decode_s64_inv1;
+    procedure Test_decode_s64_inv2;
+    procedure Test_decode_s64_inv3;
+    procedure Test_decode_s64_inv4;
 
     procedure Test_decode_u64;
     procedure Test_decode_u64_inv1;
@@ -75,7 +83,6 @@ begin
     var expected := tests[i].r;
     Check(v = expected);
     Check(buf.current = buf.begins + buf.bufferSize);
-    Check(buf.current = buf.begins + buf.bufferSize);
   end;
 end;
 
@@ -107,7 +114,6 @@ begin
     var v := buf.readUint32;
     var expected := tests[i].r;
     Check(v = expected);
-    Check(buf.current = buf.begins + buf.bufferSize);
     Check(buf.current = buf.begins + buf.bufferSize);
   end;
 end;
@@ -146,7 +152,6 @@ begin
     var expected := tests[i].r;
     Check(v = expected);
     Check(buf.current = buf.begins + buf.bufferSize);
-    Check(buf.current = buf.begins + buf.bufferSize);
   end;
 end;
 
@@ -182,8 +187,55 @@ begin
     var expected := tests[i].r;
     Check(v = expected);
     Check(buf.current = buf.begins + buf.bufferSize);
-    Check(buf.current = buf.begins + buf.bufferSize);
   end;
+end;
+
+procedure TestLeb128.Test_decode_s32_inv1;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$80, $80, $80, $80, $70];
+  buf := TInputBuffer.From(bytes);
+  buf.readInt32;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_s32_inv2;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$80, $80, $80, $80, $10];
+  buf := TInputBuffer.From(bytes);
+  buf.readInt32;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_s32_inv3;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$ff, $ff, $ff, $ff, $0f];
+  buf := TInputBuffer.From(bytes);
+  buf.readInt32;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_s32_inv4;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$ff, $ff, $ff, $ff, $4f];
+  buf := TInputBuffer.From(bytes);
+  buf.readInt32;
+  StopExpectingException();
 end;
 
 procedure TestLeb128.Test_decode_u32_inv1;
@@ -255,6 +307,54 @@ begin
   bytes := [$80, $80, $80, $80, $1f];
   buf := TInputBuffer.From(bytes);
   buf.readUint32;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_s64_inv1;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$81, $80, $80, $80, $80, $80, $80, $80, $80, $80];
+  buf := TInputBuffer.From(bytes);
+  buf.readInt64;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_s64_inv2;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $01];
+  buf := TInputBuffer.From(bytes);
+  buf.readInt64;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_s64_inv3;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $01];
+  buf := TInputBuffer.From(bytes);
+  buf.readInt64;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_s64_inv4;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $79];
+  buf := TInputBuffer.From(bytes);
+  buf.readInt64;
   StopExpectingException();
 end;
 
