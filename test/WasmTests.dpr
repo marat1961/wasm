@@ -14,13 +14,13 @@ uses
   Oz.Wasm.Types in '..\src\Oz.Wasm.Types.pas',
   Oz.Wasm.Utils in '..\src\Oz.Wasm.Utils.pas',
   Oz.Wasm.Value in '..\src\Oz.Wasm.Value.pas',
-  Oz.Wasm.TestNumeric in 'Oz.Wasm.TestNumeric.pas',
   Oz.Wasm.Instantiate in '..\src\Oz.Wasm.Instantiate.pas',
   Oz.Wasm.Parser in '..\src\Oz.Wasm.Parser.pas',
   Oz.Wasm.Buffer in '..\src\Oz.Wasm.Buffer.pas',
   Oz.Wasm.ParseExpression in '..\src\Oz.Wasm.ParseExpression.pas',
-  Oz.Wasm.TestUtils in 'Oz.Wasm.TestUtils.pas',
-  Oz.Wasm.TestBuffer in 'Oz.Wasm.TestBuffer.pas';
+  Oz.Wasm.TestBuffer in 'Oz.Wasm.TestBuffer.pas',
+  Oz.Wasm.TestNumeric in 'Oz.Wasm.TestNumeric.pas',
+  Oz.Wasm.TestUtils in 'Oz.Wasm.TestUtils.pas';
 
 {$R *.RES}
 

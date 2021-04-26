@@ -8,7 +8,7 @@ interface
 
 uses
   System.SysUtils, System.Math, TestFramework, DUnitX.TestFramework,
-  Oz.Wasm.Buffer;
+  Oz.Wasm.Value, Oz.Wasm.Buffer;
 
 {$Region 'TestLeb128'}
 
@@ -16,9 +16,23 @@ type
   TestLeb128 = class(TTestCase)
   published
     procedure Test_decode_s32;
+
     procedure Test_decode_u32;
+    procedure Test_decode_u32_inv1;
+    procedure Test_decode_u32_inv2;
+    procedure Test_decode_u32_inv3;
+    procedure Test_decode_u32_inv4;
+    procedure Test_decode_u32_inv5;
+    procedure Test_decode_u32_inv6;
+
     procedure Test_decode_s64;
+
     procedure Test_decode_u64;
+    procedure Test_decode_u64_inv1;
+    procedure Test_decode_u64_inv2;
+    procedure Test_decode_u64_inv3;
+    procedure Test_decode_u64_inv4;
+    procedure Test_decode_u64_inv5;
   end;
 
 {$EndRegion}
@@ -170,6 +184,138 @@ begin
     Check(buf.current = buf.begins + buf.bufferSize);
     Check(buf.current = buf.begins + buf.bufferSize);
   end;
+end;
+
+procedure TestLeb128.Test_decode_u32_inv1;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$e5, $8e, $a6];
+  buf := TInputBuffer.From(bytes);
+  buf.readUint32;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_u32_inv2;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$81, $80, $80, $80, $80, $00];
+  buf := TInputBuffer.From(bytes);
+  buf.readUint32;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_u32_inv3;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$ff, $ff, $ff, $ff, $ff, $00];
+  buf := TInputBuffer.From(bytes);
+  buf.readUint32;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_u32_inv4;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$ff, $ff, $ff, $ff, $7f];
+  buf := TInputBuffer.From(bytes);
+  buf.readUint32;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_u32_inv5;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$82, $80, $80, $80, $70];
+  buf := TInputBuffer.From(bytes);
+  buf.readUint32;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_u32_inv6;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$80, $80, $80, $80, $1f];
+  buf := TInputBuffer.From(bytes);
+  buf.readUint32;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_u64_inv1;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$e5, $8e, $a6];
+  buf := TInputBuffer.From(bytes);
+  buf.readUint64;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_u64_inv2;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$81, $80, $80, $80, $80, $80, $80, $80, $80, $80];
+  buf := TInputBuffer.From(bytes);
+  buf.readUint64;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_u64_inv3;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $81, $00];
+  buf := TInputBuffer.From(bytes);
+  buf.readUint64;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_u64_inv4;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $7f];
+  buf := TInputBuffer.From(bytes);
+  buf.readUint64;
+  StopExpectingException();
+end;
+
+procedure TestLeb128.Test_decode_u64_inv5;
+var
+  bytes: TBytes;
+  buf: TInputBuffer;
+begin
+  StartExpectingException(EWasmError);
+  bytes := [$ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $19];
+  buf := TInputBuffer.From(bytes);
+  buf.readUint64;
+  StopExpectingException();
 end;
 
 {$EndRegion}

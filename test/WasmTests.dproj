@@ -106,13 +106,13 @@
         <DCCReference Include="..\src\Oz.Wasm.Types.pas"/>
         <DCCReference Include="..\src\Oz.Wasm.Utils.pas"/>
         <DCCReference Include="..\src\Oz.Wasm.Value.pas"/>
-        <DCCReference Include="Oz.Wasm.TestNumeric.pas"/>
         <DCCReference Include="..\src\Oz.Wasm.Instantiate.pas"/>
         <DCCReference Include="..\src\Oz.Wasm.Parser.pas"/>
         <DCCReference Include="..\src\Oz.Wasm.Buffer.pas"/>
         <DCCReference Include="..\src\Oz.Wasm.ParseExpression.pas"/>
-        <DCCReference Include="Oz.Wasm.TestUtils.pas"/>
         <DCCReference Include="Oz.Wasm.TestBuffer.pas"/>
+        <DCCReference Include="Oz.Wasm.TestNumeric.pas"/>
+        <DCCReference Include="Oz.Wasm.TestUtils.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
@@ -135,8 +135,20 @@
                 </Source>
             </Delphi.Personality>
             <Deployment Version="3">
+                <DeployFile LocalName="..\bin\Debug\Win64\WasmTests.rsm" Configuration="Debug" Class="DebugSymbols">
+                    <Platform Name="Win64">
+                        <RemoteName>WasmTests.rsm</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
                 <DeployFile LocalName="$(BDS)\Redist\osx32\libcgunwind.1.0.dylib" Class="DependencyModule">
                     <Platform Name="OSX32">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="..\bin\Debug\Win64\WasmTests.exe" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win64">
+                        <RemoteName>WasmTests.exe</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>

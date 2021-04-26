@@ -218,8 +218,8 @@ end;
 
 function TInputBuffer.readLeb32s: Int32;
 var
-  b: ShortInt;
   shift: Integer;
+  b: ShortInt;
   r: UInt32;
 begin
   shift := 0;
@@ -228,7 +228,7 @@ begin
     if shift >= sizeof(Int32) * 8 then
       raise EWasmError.Create(EWasmError.MalformedVarint);
     b := readByte;
-    r := r or ((b and $7f) shl shift);
+    r := r or (UInt32(b and $7f) shl shift);
     Inc(shift, 7);
   until b >= 0;
   // sign extend
@@ -245,17 +245,17 @@ var
 begin
   r := 0;
   shift := 0;
-  while shift < sizeof(Uint32) * 8 do
+  while shift < 32 do
   begin
     b := readByte;
     r := r or (Uint32(b and $7F) shl shift);
-    if b and $80 = 0 then
+    if (b and $80 = 0) then
     begin
-      if b <> r shr shift then
+      if r shr shift <> b then
         raise EWasmError.Create(EWasmError.MalformedVarint);
       exit(r);
     end;
-    shift := shift + 7;
+    Inc(shift, 7);
   end;
   raise EWasmError.Create(EWasmError.TooManyBytes);
 end;
@@ -264,19 +264,21 @@ function TInputBuffer.readLeb64s: Int64;
 var
   b: ShortInt;
   shift: Integer;
-  i64: Int64;
+  r: Uint64;
 begin
-  shift := -7;
-  Result := 0;
+  shift := 0;
+  r := 0;
   repeat
-    Inc(shift, 7);
     if shift >= 64 then
       EWasmError.Create(EWasmError.MalformedVarint);
     b := readByte;
-    i64 := b and $7f;
-    i64 := i64 shl shift;
-    Result := Result or i64;
+    r := r or (Uint64(b and $7f) shl shift);
+    Inc(shift, 7);
   until b >= 0;
+  // sign extend
+  if b and $40 <> 0 then
+    r := r or (UInt64.MaxValue shl shift);
+  Result := r;
 end;
 
 function TInputBuffer.readLeb64u: Uint64;
@@ -287,17 +289,17 @@ var
 begin
   r := 0;
   shift := 0;
-  while shift < sizeof(Uint64) * 8 do
+  while shift < 64 do
   begin
     b := readByte;
     r := r or (Uint64(b and $7F) shl shift);
-    if b and $80 = 0 then
+    if (b and $80 = 0) then
     begin
-      if b <> r shr shift then
+      if r shr shift <> b then
         raise EWasmError.Create(EWasmError.MalformedVarint);
       exit(r);
     end;
-    shift := shift + 7;
+    Inc(shift, 7);
   end;
   raise EWasmError.Create(EWasmError.TooManyBytes);
 end;
@@ -344,7 +346,7 @@ function TInputBuffer.startsWith(const bytes: TBytesView): Boolean;
 begin
   if bytes.size = 0 then
     Result := True
-  else if unreadSize >= bytes.size then
+  else if unreadSize >= Integer(bytes.size) then
     Result := CompareMem(FCurrent, bytes.data, bytes.size)
   else
     Result := False;
