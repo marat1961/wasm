@@ -81,15 +81,25 @@ function ToHex(const bytes: TBytes): AnsiString;
 
 implementation
 
-function Ash32(value, shift: Integer): Integer;
-asm
-  mov eax, value
-  mov ecx, shift
-  sar eax, cl
-  mov result, eax
+//function Ash32(value, shift: Integer): Integer;
+//asm
+//  mov eax, value
+//  mov ecx, shift
+//  sar eax, cl
+//  mov result, eax
+//end;
+
+function Ash32(value: Int32; shift: Uint32): Int32;
+begin
+  result := (value and Int32.MaxValue) shr shift;
+  Dec(result, (value and (not Int32.MaxValue)) shr shift);
 end;
-//  result := (value and Int32.MaxValue) shr shift -
-//            (value and (not Int32.MaxValue)) shr shift;
+
+function Ash64(value: Int64; shift: Uint32): Int64;
+begin
+  result := (value and Int64.MaxValue) shr shift -
+            (value and (not Int64.MaxValue)) shr shift;
+end;
 
 function FromHex(const hex: AnsiString): TBytes;
 
