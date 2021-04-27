@@ -294,23 +294,35 @@ end;
 
 function TInputBuffer.readLeb64s: Int64;
 var
-  b: ShortInt;
   shift: Integer;
+  b, expected: Byte;
   r: Uint64;
 begin
   shift := 0;
   r := 0;
-  repeat
-    if shift >= 64 then
-      EWasmError.Create(EWasmError.MalformedVarint);
+  while shift < 64 do
+  begin
     b := readByte;
     r := r or (Uint64(b and $7f) shl shift);
+    if b and $80 = 0 then
+    begin
+      if shift + 7 < 64 then
+      begin
+        if b and $40 <> 0 then
+          // sign extend
+          r := r or (UInt64.MaxValue shl (shift + 7));
+      end
+      else
+      begin
+        expected := Ash64(r, shift);
+        if expected and $7F <> b then
+          raise EWasmError.Create(EWasmError.MalformedVarint);
+      end;
+      exit(r);
+    end;
     Inc(shift, 7);
-  until b >= 0;
-  // sign extend
-  if b and $40 <> 0 then
-    r := r or (UInt64.MaxValue shl shift);
-  Result := r;
+  end;
+  raise EWasmError.Create(EWasmError.TooManyBytes);
 end;
 
 function TInputBuffer.readLeb64u: Uint64;
