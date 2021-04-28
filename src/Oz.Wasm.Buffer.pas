@@ -7,7 +7,7 @@ unit Oz.Wasm.Buffer;
 interface
 
 uses
-  System.SysUtils, System.Math, Oz.Wasm.Value, Oz.Wasm.Utils;
+  System.SysUtils, System.Math, Oz.Wasm.Operations, Oz.Wasm.Value, Oz.Wasm.Utils;
 
 {$T+}
 {$SCOPEDENUMS ON}
@@ -32,6 +32,10 @@ type
     class function From(const Buf: TBytes): TInputBuffer; overload; static;
     procedure Init(Buf: PByte; BufSize: Integer; OwnsData: Boolean);
     procedure Free;
+
+    class function FromHex(const hex: AnsiString): TBytes; static;
+    class function ToHex(const bytes: TBytes): AnsiString; static;
+
     // No more data
     function Eof: Boolean;
     // Read one byte
@@ -76,69 +80,7 @@ type
 
 {$EndRegion}
 
-function FromHex(const hex: AnsiString): TBytes;
-function ToHex(const bytes: TBytes): AnsiString;
-
 implementation
-
-//function Ash32(value, shift: Integer): Integer;
-//asm
-//  mov eax, value
-//  mov ecx, shift
-//  sar eax, cl
-//  mov result, eax
-//end;
-
-function Ash32(value: Int32; shift: Uint32): Int32;
-begin
-  result := (value and Int32.MaxValue) shr shift;
-  Dec(result, (value and (not Int32.MaxValue)) shr shift);
-end;
-
-function Ash64(value: Int64; shift: Uint32): Int64;
-begin
-  result := (value and Int64.MaxValue) shr shift -
-            (value and (not Int64.MaxValue)) shr shift;
-end;
-
-function FromHex(const hex: AnsiString): TBytes;
-
-  function GetHex(var p: PAnsiChar): Integer;
-  begin
-    case p^ of
-      '0'..'9': Result := Ord(p^) - Ord('0');
-      'a'..'f': Result := Ord(p^) - Ord('a') + 10;
-      'A'..'F': Result := Ord(p^) - Ord('A') + 10;
-      else raise EWasmError.Create('not a hex digit');
-    end;
-    Inc(p);
-  end;
-
-begin
-  var n := Length(hex);
-  if Odd(n) then raise EWasmError.Create('the length of the input is odd');
-  n := n div 2;
-  SetLength(Result, n);
-  var p := PAnsiChar(hex);
-  for var i := 0 to n - 1 do
-    Result[i] := GetHex(p) * 16 + GetHex(p);
-end;
-
-function ToHex(const bytes: TBytes): AnsiString;
-const
-  HEX: AnsiString = '0123456789abcdef';
-begin
-  SetLength(Result, Length(bytes) * 2);
-  var j := 0;
-  for var i := 0 to High(bytes) do
-  begin
-    var b := bytes[i];
-    Result[j] := HEX[b and $F];
-    Inc(j);
-    Result[j] := HEX[b and $F0 shr 4];
-    Inc(j);
-  end;
-end;
 
 {$Region 'TInputBuffer'}
 
@@ -172,6 +114,45 @@ begin
   if FOwnsData then
     FreeMem(FBuf);
   Self := Default(TInputBuffer);
+end;
+
+class function TInputBuffer.FromHex(const hex: AnsiString): TBytes;
+
+  function GetHex(var p: PAnsiChar): Integer;
+  begin
+    case p^ of
+      '0'..'9': Result := Ord(p^) - Ord('0');
+      'a'..'f': Result := Ord(p^) - Ord('a') + 10;
+      'A'..'F': Result := Ord(p^) - Ord('A') + 10;
+      else raise EWasmError.Create('not a hex digit');
+    end;
+    Inc(p);
+  end;
+
+begin
+  var n := Length(hex);
+  if Odd(n) then raise EWasmError.Create('the length of the input is odd');
+  n := n div 2;
+  SetLength(Result, n);
+  var p := PAnsiChar(hex);
+  for var i := 0 to n - 1 do
+    Result[i] := GetHex(p) * 16 + GetHex(p);
+end;
+
+class function TInputBuffer.ToHex(const bytes: TBytes): AnsiString;
+const
+  HEX: AnsiString = '0123456789abcdef';
+begin
+  SetLength(Result, Length(bytes) * 2);
+  var j := 0;
+  for var i := 0 to High(bytes) do
+  begin
+    var b := bytes[i];
+    Result[j] := HEX[b and $F];
+    Inc(j);
+    Result[j] := HEX[b and $F0 shr 4];
+    Inc(j);
+  end;
 end;
 
 function TInputBuffer.GetBufferSize: Integer;

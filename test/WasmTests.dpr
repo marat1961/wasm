@@ -20,7 +20,8 @@ uses
   Oz.Wasm.ParseExpression in '..\src\Oz.Wasm.ParseExpression.pas',
   Oz.Wasm.TestBuffer in 'Oz.Wasm.TestBuffer.pas',
   Oz.Wasm.TestNumeric in 'Oz.Wasm.TestNumeric.pas',
-  Oz.Wasm.TestUtils in 'Oz.Wasm.TestUtils.pas';
+  Oz.Wasm.TestUtils in 'Oz.Wasm.TestUtils.pas',
+  Oz.Wasm.Operations in '..\src\Oz.Wasm.Operations.pas';
 
 {$R *.RES}
 

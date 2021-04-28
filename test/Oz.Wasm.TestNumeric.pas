@@ -8,8 +8,8 @@ interface
 
 uses
   System.SysUtils, System.Math, TestFramework, DUnitX.TestFramework,
-  Oz.Wasm.Value, Oz.Wasm.Types, Oz.Wasm.Module, Oz.Wasm.Instruction,
-  Oz.Wasm.Instantiate, Oz.Wasm.Interpreter;
+  Oz.Wasm.Operations, Oz.Wasm.Value, Oz.Wasm.Types, Oz.Wasm.Module,
+  Oz.Wasm.Instruction, Oz.Wasm.Instantiate, Oz.Wasm.Interpreter;
 
 type
   TestNumeric = class(TTestCase)

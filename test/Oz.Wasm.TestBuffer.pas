@@ -77,7 +77,7 @@ begin
   for var i := 0 to High(tests) do
   begin
     var hex := tests[i].d;
-    var bytes := FromHex(hex);
+    var bytes := TInputBuffer.FromHex(hex);
     var buf := TInputBuffer.From(bytes);
     var v := buf.readInt32;
     var expected := tests[i].r;
@@ -109,7 +109,7 @@ begin
   for var i := 0 to High(tests) do
   begin
     var hex := tests[i].d;
-    var bytes := FromHex(hex);
+    var bytes := TInputBuffer.FromHex(hex);
     var buf := TInputBuffer.From(bytes);
     var v := buf.readUint32;
     var expected := tests[i].r;
@@ -146,7 +146,7 @@ begin
   for var i := 0 to High(tests) do
   begin
     var hex := tests[i].d;
-    var bytes := FromHex(hex);
+    var bytes := TInputBuffer.FromHex(hex);
     var buf := TInputBuffer.From(bytes);
     var v := buf.readInt64;
     var expected := tests[i].r;
@@ -181,7 +181,7 @@ begin
   for var i := 0 to High(tests) do
   begin
     var hex := tests[i].d;
-    var bytes := FromHex(hex);
+    var bytes := TInputBuffer.FromHex(hex);
     var buf := TInputBuffer.From(bytes);
     var v := buf.readUint64;
     var expected := tests[i].r;
