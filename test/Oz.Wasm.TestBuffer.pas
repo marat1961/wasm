@@ -10,9 +10,23 @@ uses
   System.SysUtils, System.Math, TestFramework, DUnitX.TestFramework,
   Oz.Wasm.Value, Oz.Wasm.Buffer;
 
+type
+
+{$Region 'TestBuffer'}
+
+  TestBuffer = class(TTestCase)
+  published
+    procedure Test_empty;
+    procedure Test_readByte;
+    procedure Test_readBytes;
+    procedure Test_readValue;
+    procedure Test_readArray;
+    procedure Test_readString;
+    procedure Test_readUTF8String;
+  end;
+
 {$Region 'TestLeb128'}
 
-type
   TestLeb128 = class(TTestCase)
   published
     procedure Test_decode_s32;
@@ -46,6 +60,70 @@ type
 {$EndRegion}
 
 implementation
+
+{$Region 'TestBuffer'}
+
+procedure TestBuffer.Test_empty;
+begin
+  var bytes: TBytes := [];
+  var buf := TInputBuffer.From(bytes);
+  CheckTrue(buf.current = nil);
+  CheckTrue(buf.begins = nil);
+  CheckTrue(buf.begins = buf.ends);
+  CheckTrue(buf.size = 0);
+  CheckTrue(buf.Eof);
+  StartExpectingException(EWasmError);
+  buf.readByte;
+  StopExpectingException();
+end;
+
+procedure TestBuffer.Test_readByte;
+begin
+  var bytes: TBytes := [1, 55];
+  var buf := TInputBuffer.From(bytes);
+  CheckTrue(buf.current^ = 1);
+  CheckTrue(buf.begins^ = 1);
+  CheckTrue(buf.begins = buf.ends - 2);
+  CheckTrue(buf.size = 2);
+  CheckTrue(buf.unreadSize = 2);
+  CheckTrue(not buf.Eof);
+  var b := buf.readByte;
+  CheckTrue(b = 1);
+  CheckTrue(buf.unreadSize = 1);
+  b := buf.readByte;
+  CheckTrue(b = 55);
+  CheckTrue(buf.unreadSize = 0);
+  StartExpectingException(EWasmError);
+  buf.readByte;
+  StopExpectingException();
+end;
+
+procedure TestBuffer.Test_readBytes;
+begin
+
+end;
+
+procedure TestBuffer.Test_readValue;
+begin
+
+end;
+
+procedure TestBuffer.Test_readArray;
+begin
+
+end;
+
+procedure TestBuffer.Test_readString;
+begin
+
+end;
+
+procedure TestBuffer.Test_readUTF8String;
+begin
+
+end;
+
+{$EndRegion}
 
 {$Region 'TestLeb128'}
 
@@ -82,7 +160,7 @@ begin
     var v := buf.readInt32;
     var expected := tests[i].r;
     Check(v = expected);
-    Check(buf.current = buf.begins + buf.bufferSize);
+    Check(buf.current = buf.begins + buf.size);
   end;
 end;
 
@@ -114,7 +192,7 @@ begin
     var v := buf.readUint32;
     var expected := tests[i].r;
     Check(v = expected);
-    Check(buf.current = buf.begins + buf.bufferSize);
+    Check(buf.current = buf.begins + buf.size);
   end;
 end;
 
@@ -151,7 +229,7 @@ begin
     var v := buf.readInt64;
     var expected := tests[i].r;
     Check(v = expected);
-    Check(buf.current = buf.begins + buf.bufferSize);
+    Check(buf.current = buf.begins + buf.size);
   end;
 end;
 
@@ -186,7 +264,7 @@ begin
     var v := buf.readUint64;
     var expected := tests[i].r;
     Check(v = expected);
-    Check(buf.current = buf.begins + buf.bufferSize);
+    Check(buf.current = buf.begins + buf.size);
   end;
 end;
 
@@ -421,5 +499,6 @@ end;
 {$EndRegion}
 
 initialization
+  RegisterTest(TestBuffer.Suite);
   RegisterTest(TestLeb128.Suite);
 end.

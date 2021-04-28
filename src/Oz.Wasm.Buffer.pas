@@ -22,15 +22,15 @@ type
     TParseFunc<T> = function(var buf: TInputBuffer): T;
   private
     FBuf: PByte;
-    FLast: PByte;
+    FEnds: PByte;
     FCurrent: PByte;
     FOwnsData: Boolean;
-    function GetBufferSize: Integer; inline;
+    function GetSize: Integer; inline;
     function GetUnreadSize: Integer; inline;
   public
     class function From(const input: TBytesView): TInputBuffer; overload; static;
     class function From(const Buf: TBytes): TInputBuffer; overload; static;
-    procedure Init(Buf: PByte; BufSize: Integer; OwnsData: Boolean);
+    procedure Init(Buf: PByte; Size: Integer; OwnsData: Boolean);
     procedure Free;
 
     class function FromHex(const hex: AnsiString): TBytes; static;
@@ -71,9 +71,9 @@ type
     // Buffer begin position
     property begins: PByte read FBuf;
     // Buffer end position
-    property ends: PByte read FLast;
+    property ends: PByte read FEnds;
     // Buffer size
-    property bufferSize: Integer read GetBufferSize;
+    property size: Integer read GetSize;
     // The size of the unread part of the buffer
     property unreadSize: Integer read GetUnreadSize;
   end;
@@ -94,7 +94,7 @@ begin
   Result.Init(@Buf[0], Length(Buf), False);
 end;
 
-procedure TInputBuffer.Init(Buf: PByte; BufSize: Integer; OwnsData: Boolean);
+procedure TInputBuffer.Init(Buf: PByte; Size: Integer; OwnsData: Boolean);
 begin
   FOwnsData := OwnsData;
   if not OwnsData then
@@ -102,11 +102,11 @@ begin
   else
   begin
     // allocate a buffer and copy the data
-    GetMem(FBuf, BufSize);
-    Move(Buf^, FBuf^, BufSize);
+    GetMem(FBuf, Size);
+    Move(Buf^, FBuf^, Size);
   end;
   FCurrent := FBuf;
-  FLast := FBuf + BufSize;
+  FEnds := FBuf + Size;
 end;
 
 procedure TInputBuffer.Free;
@@ -155,14 +155,14 @@ begin
   end;
 end;
 
-function TInputBuffer.GetBufferSize: Integer;
+function TInputBuffer.GetSize: Integer;
 begin
-  Result := FLast - FBuf;
+  Result := FEnds - FBuf;
 end;
 
 function TInputBuffer.GetUnreadSize: Integer;
 begin
-  Result := FLast - FCurrent;
+  Result := FEnds - FCurrent;
 end;
 
 procedure TInputBuffer.checkUnread(size: Integer);
@@ -173,12 +173,12 @@ end;
 
 function TInputBuffer.Eof: Boolean;
 begin
-  Result := FCurrent >= FLast;
+  Result := FCurrent >= FEnds;
 end;
 
 function TInputBuffer.readByte: Byte;
 begin
-  if FCurrent > FLast then
+  if FCurrent >= FEnds then
     raise EWasmError.Create(EWasmError.EofEncounterd);
   Result := ShortInt(FCurrent^);
   Inc(FCurrent);
@@ -192,7 +192,7 @@ begin
   // todo: correct check
   if size <= 0 then
      raise EWasmError.Create(EWasmError.InvalidSize);
-  if FCurrent > FLast then
+  if FCurrent >= FEnds then
     raise EWasmError.Create(EWasmError.EofEncounterd);
   SetLength(Result, size);
   Move(FCurrent^, Pointer(Result)^, size);
