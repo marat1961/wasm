@@ -100,7 +100,12 @@ end;
 
 procedure TestBuffer.Test_readBytes;
 begin
-
+  var bytes: TBytes := [7, 1, 2, 3, 4, 5, 6, 7];
+  var buf := TInputBuffer.From(bytes);
+  var r := buf.readBytes;
+  CheckTrue(Length(r) = 7);
+  for var i: Byte := 0 to High(r) do
+    CheckTrue(r[i] = i + 1);
 end;
 
 procedure TestBuffer.Test_readValue;
