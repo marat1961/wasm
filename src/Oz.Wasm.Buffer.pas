@@ -186,12 +186,13 @@ end;
 
 function TInputBuffer.readBytes: TBytes;
 var
-  size: UInt32;
+  size: Int32;
 begin
   size := readLeb32u;
-  // todo: correct check
-  if size <= 0 then
-     raise EWasmError.Create(EWasmError.InvalidSize);
+  if size < 0 then
+    raise EWasmError.Create(EWasmError.InvalidSize)
+  else if size = 0 then
+    exit(nil);
   if FCurrent >= FEnds then
     raise EWasmError.Create(EWasmError.EofEncounterd);
   SetLength(Result, size);

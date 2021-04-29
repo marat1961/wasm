@@ -25,6 +25,8 @@ type
     procedure Test_readUTF8String;
   end;
 
+{$EndRegion}
+
 {$Region 'TestLeb128'}
 
   TestLeb128 = class(TTestCase)
@@ -99,10 +101,18 @@ begin
 end;
 
 procedure TestBuffer.Test_readBytes;
+var
+  buf: TInputBuffer;
+  bytes, r: TBytes;
 begin
-  var bytes: TBytes := [7, 1, 2, 3, 4, 5, 6, 7];
-  var buf := TInputBuffer.From(bytes);
-  var r := buf.readBytes;
+  bytes := [0];
+  buf := TInputBuffer.From(bytes);
+  r := buf.readBytes;
+  CheckTrue(Length(r) = 0);
+
+  bytes := [7, 1, 2, 3, 4, 5, 6, 7];
+  buf := TInputBuffer.From(bytes);
+  r := buf.readBytes;
   CheckTrue(Length(r) = 7);
   for var i: Byte := 0 to High(r) do
     CheckTrue(r[i] = i + 1);
