@@ -25,7 +25,7 @@ function ctz64(value: Uint64): Uint64;
 function popcount32(value: Uint32): Uint32;
 function popcount64(value: Uint64): Uint64;
 // Arithmetic shift right
-function Ash32(value: Int32; shift: Uint32): Int32;
+function Ash32(value, shift: Uint32): Int32;
 function Ash64(value: Int64; shift: Uint32): Int64;
 
 {$EndRegion}
@@ -62,41 +62,41 @@ end;
 function __builtin_clz(x: Uint32): Uint32;
 asm
 {$IF Defined(CPUX64)}
-  BSR     ECX,ECX
-  NEG     ECX
-  ADD     ECX,31
-  MOV     EAX,ECX
+    BSR   ECX,ECX
+    NEG   ECX
+    ADD   ECX,31
+    MOV   EAX,ECX
 {$ENDIF}
 {$IF Defined(CPUX86)}
-  BSR     EAX,EAX
-  NEG     EAX
-  ADD     EAX,31
+    BSR   EAX,EAX
+    NEG   EAX
+    ADD   EAX,31
 {$ENDIF}
 end;
 
 function __builtin_ctz(x: Uint32): Uint32;
 asm
 {$IF Defined(CPUX64)}
-  BSF     ECX,ECX
-  MOV     EAX,ECX
+    BSF   ECX,ECX
+    MOV   EAX,ECX
 {$ENDIF}
 {$IF Defined(CPUX86)}
-  BSF     EAX,EAX
+    BSF   EAX,EAX
 {$ENDIF}
 end;
 
 function __builtin_clzll(x: Uint64): Uint64;
 asm
 {$IF Defined(CPUX64)}
-  BSR     RCX,RCX
-  NEG     RCX
-  ADD     RCX,63
-  MOV     RAX,RCX
+    BSR   RCX,RCX
+    NEG   RCX
+    ADD   RCX,63
+    MOV   RAX,RCX
 {$ENDIF}
 {$IF Defined(CPUX86)}
-  BSR     EAX,EAX
-  NEG     EAX
-  ADD     EAX,63
+    BSR   EAX,EAX
+    NEG   EAX
+    ADD   EAX,63
 {$ENDIF}
 end;
 
@@ -167,15 +167,61 @@ begin
 end;
 {$ENDIF}
 
-//function Ash32(value, shift: Integer): Integer;
-//asm
-//  mov eax, value
-//  mov ecx, shift
-//  sar eax, cl
-//  mov result, eax
-//end;
+{$IF Defined(CPUX86)}
+function Ash32(value, shift: Uint32): Int32;
+asm
+    MOV   EAX,value
+    MOV   ECX,shift
+    SAR   EAX,CL
+    MOV   Result,EAX
+end;
 
-function Ash32(value: Int32; shift: Uint32): Int32;
+// target (EDX:EAX) count (ECX)
+function Ash64(value: Int64; shift: Uint32): Int64;
+asm
+    MOV   ECX,shift
+    MOV   EAX,[EBP+$08]
+    MOV   EDX,[EBP+$0c]
+    AND   CL,$3F
+    CMP   CL,32
+    JL    @ash64@below32
+    MOV   EAX,EDX
+    CDQ
+    SAR   EAX,CL
+    JMP   @ash64@ret
+@ash64@below32:
+    SHRD  EAX,EDX,CL
+    SAR   EDX,CL
+@ash64@ret:
+    MOV   [EBP-$10],EAX
+    MOV   [EBP-$0c],EDX
+end;
+
+{$ENDIF}
+
+{$IF Defined(CPUX64)}
+function Ash32(value, shift: Uint32): Int32;
+asm
+    MOV   EAX,value
+    MOV   ECX,shift
+    AND   CL,$3F
+    SAR   EAX,CL
+    MOV   Result,EAX
+end;
+
+function Ash64(value: Int64; shift: Uint32): Int64;
+asm
+    MOV   RAX,value
+    MOV   ECX,shift
+    SAR   RAX,CL
+    MOV   Result,RAX
+end;
+
+{$ENDIF}
+
+{$IF Defined(PUREPASCAL)}
+
+function Ash32(value, shift: Uint32): Int32;
 begin
   result := (value and Int32.MaxValue) shr shift;
   Dec(result, (value and (not Int32.MaxValue)) shr shift);
@@ -186,6 +232,8 @@ begin
   result := (value and Int64.MaxValue) shr shift -
             (value and (not Int64.MaxValue)) shr shift;
 end;
+
+{$ENDIF}
 
 {$EndRegion}
 
