@@ -328,7 +328,7 @@ begin
   FTop := FBottom;
   Dec(FTop);
 
-  var localVariables := TStd.CopyN<PValue>(args, numArgs, FLocals^);
+  var localVariables := TStd.CopyN<TValue>(args, numArgs, FLocals^);
   TStd.FillN<TValue>(localVariables, numLocalVariables, TValue.From(0));
 end;
 
