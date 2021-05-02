@@ -6,6 +6,12 @@ unit Oz.Wasm.Operations;
 
 interface
 
+{$IF Defined(ASSEMBLER)}
+  {$DEFINE X86ASM}
+{$ELSE}
+  {$DEFINE PUREPASCAL}
+{$ENDIF}
+
 uses
   System.SysUtils, System.Math;
 
@@ -220,7 +226,6 @@ end;
 {$ENDIF}
 
 {$IF Defined(PUREPASCAL)}
-
 function Ash32(value, shift: Uint32): Int32;
 begin
   result := (value and Int32.MaxValue) shr shift;
