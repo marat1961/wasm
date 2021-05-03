@@ -159,21 +159,26 @@ begin
 end;
 
 {$IF Defined(CPUX64)}
+
 function popcount64(value: Uint64): Uint64;
 asm
   POPCNT  RCX,RCX
   MOV     RAX,RCX
 end;
+
 {$ENDIF}
 
-{$IF Defined(CPUX86)}
+{$IF Defined(CPUX86) or Defined(PUREPASCAL)}
+
 function popcount64(value: Uint64): Uint64;
 begin
   Result := popcount32(U64(value).hi) + popcount32(U64(value).lo);
 end;
+
 {$ENDIF}
 
 {$IF Defined(CPUX86)}
+
 function Ash32(value, shift: Uint32): Int32;
 asm
     MOV   EAX,value
@@ -206,6 +211,7 @@ end;
 {$ENDIF}
 
 {$IF Defined(CPUX64)}
+
 function Ash32(value, shift: Uint32): Int32;
 asm
     MOV   EAX,value
@@ -226,6 +232,7 @@ end;
 {$ENDIF}
 
 {$IF Defined(PUREPASCAL)}
+
 function Ash32(value, shift: Uint32): Int32;
 begin
   result := (value and Int32.MaxValue) shr shift;
