@@ -13,7 +13,7 @@ uses
 
 type
   TestNumeric = class(TTestCase)
-  private
+  public
     function createUnaryOperationExecutor(instr: TInstruction;
       const args: PValue): TExecutionResult;
     function createBinaryOperationExecutor(instr: TInstruction;
