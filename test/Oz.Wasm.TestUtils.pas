@@ -288,7 +288,7 @@ var
 begin
   var maxHeight := 33;
   stack := TOperandStack.From(nil, 0, 0, maxHeight);
-  Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) > 100, 'not allocated on the heap"');
+  Check(Abs(Pbyte(@stack) - Pbyte(stack.rbegin)) > 100, 'not allocated on the heap');
   Check(stack.size = 0);
 
   for i := 0 to maxHeight - 1 do

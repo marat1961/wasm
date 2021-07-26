@@ -66,7 +66,7 @@ type
 
 {$EndRegion}
 
-{$Region 'execute functions'}
+{$Region 'Execute functions'}
 
 // Execute a function from an instance with execution context
 // starting with default depth of 0.
@@ -261,7 +261,7 @@ begin
         end;
       TInstruction.else:
         begin
-          // We reach else only after executing if block ("then" part),
+          // We reach else only after executing if block ('then' part),
           // so we need to skip else block now.
           var target_pc := pc.read<Uint32>;
           pc := PByte(@code.instructions[0]) + target_pc;
@@ -1188,7 +1188,6 @@ ends:
   Assert(pc = @code.instructions[Length(code.instructions)]);
   // End of code must be reached.
   Assert(stack.size = Uint32(Length(funcType.outputs)));
-
   if stack.size <> 0 then
     exit(TExecutionResult.From(stack.top^))
   else
