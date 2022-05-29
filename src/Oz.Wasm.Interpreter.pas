@@ -134,7 +134,7 @@ begin
   offset := pc.read<Uint32>;
   vi := Uint64(address) + offset;
   // Addressing is 32-bit, but we keep the value as 64-bit to detect overflows.
-  Result := vi + sizeof(SrcT) <= Uint64(Length(memory));
+  Result := vi + Uint64(sizeof(SrcT)) <= Uint64(Length(memory));
 end;
 
 function TVm.LoadFromMemory<T>: T;
@@ -154,7 +154,7 @@ begin
   offset := pc.read<Uint32>;
   vi := Uint64(address) + offset;
   // Addressing is 32-bit, but we keep the value as 64-bit to detect overflows.
-  Result := vi + sizeof(DstT) <= Length(memory);
+  Result := vi + Uint64(sizeof(DstT)) <= Length(memory);
 end;
 
 procedure TVm.StoreToMemory<T>(const value: T);
@@ -298,7 +298,7 @@ begin
           var called_funcIdx := pc.read<Uint32>;
           var called_funcType := instance.module.getFunctionType(called_funcIdx);
           if not invoke_function(called_funcType, called_funcIdx, instance, stack, ctx) then
-            goto traps;
+            exit(Trap);
         end;
       TInstruction.call_indirect:
         begin
@@ -318,9 +318,9 @@ begin
           var actual_type := called_func.instance.module.getFunctionType(called_func.funcIdx);
           var expected_type := instance.module.typesec[expected_type_idx];
           if not expected_type.Equals(actual_type) then
-            goto traps;
+            exit(Trap);
           if not invoke_function(actual_type, called_func.funcIdx, called_func.instance, stack, ctx) then
-            goto traps;
+            exit(Trap);
         end;
       TInstruction.drop:
         stack.pop;
